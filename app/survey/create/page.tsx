@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
+import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -109,6 +110,7 @@ const questionTemplates = [
 ]
 
 function CreateSurveyPageInner() {
+  const { user } = useAuth()
   const searchParams = useSearchParams()
   const editSurveyId = searchParams.get('edit')
   
@@ -189,17 +191,8 @@ function CreateSurveyPageInner() {
       }
     }
 
-    // 現在のユーザー情報を取得
-    let creatorId = 'anonymous-user'
-    try {
-      const currentUserData = localStorage.getItem('currentUser')
-      if (currentUserData) {
-        const user = JSON.parse(currentUserData)
-        creatorId = user.id || 'anonymous-user'
-      }
-    } catch (error) {
-      console.error('Error getting user data:', error)
-    }
+    // 現在のユーザー情報を取得（Firebase認証から）
+    const creatorId = user?.uid || 'anonymous-user'
 
     setIsPublishing(true)
     try {
@@ -243,17 +236,8 @@ function CreateSurveyPageInner() {
       return
     }
 
-    // 現在のユーザー情報を取得
-    let creatorId = 'anonymous-user'
-    try {
-      const currentUserData = localStorage.getItem('currentUser')
-      if (currentUserData) {
-        const user = JSON.parse(currentUserData)
-        creatorId = user.id || 'anonymous-user'
-      }
-    } catch (error) {
-      console.error('Error getting user data:', error)
-    }
+    // 現在のユーザー情報を取得（Firebase認証から）
+    const creatorId = user?.uid || 'anonymous-user'
 
     setIsSaving(true)
     try {

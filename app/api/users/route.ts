@@ -1,5 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
-import { serverFirestoreService } from "@/lib/firebase-admin"
+import { initializeApp, getApps } from "firebase/app"
+import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, serverTimestamp } from "firebase/firestore"
+
+// Firebase client config for server-side usage
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+}
+
+// Initialize Firebase for server-side API routes
+let app
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig)
+} else {
+  app = getApps()[0]
+}
+
+const db = getFirestore(app)
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,19 +28,29 @@ export async function POST(request: NextRequest) {
     const { email, name } = body
 
     // 既存ユーザーをチェック
-    const existingUser = await serverFirestoreService.users.getByEmail(email)
+    const usersQuery = query(collection(db, 'users'), where('email', '==', email))
+    const snapshot = await getDocs(usersQuery)
     
-    if (existingUser) {
+    if (!snapshot.empty) {
       // 既存ユーザーのログイン時刻を更新
-      await serverFirestoreService.users.updateLastLogin(existingUser.id)
+      const existingDoc = snapshot.docs[0]
+      await updateDoc(doc(db, 'users', existingDoc.id), {
+        last_login: serverTimestamp(),
+        updated_at: serverTimestamp()
+      })
       
-      // 更新されたユーザー情報を取得
-      const updatedUser = await serverFirestoreService.users.getByEmail(email)
-      return NextResponse.json({ user: updatedUser })
+      const userData = {
+        id: existingDoc.id,
+        ...existingDoc.data(),
+        last_login: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      return NextResponse.json({ user: userData })
     }
 
     // 新しいユーザーを作成
-    const newUserId = await serverFirestoreService.users.create({
+    const newUserData = {
       email,
       name,
       avatar_url: null,
@@ -28,11 +59,21 @@ export async function POST(request: NextRequest) {
       badges: [],
       surveys_created: 0,
       surveys_answered: 0,
-      total_responses_received: 0
-    })
+      total_responses_received: 0,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+      last_login: serverTimestamp()
+    }
 
-    // 作成されたユーザーを取得
-    const newUser = await serverFirestoreService.users.getByEmail(email)
+    const docRef = await addDoc(collection(db, 'users'), newUserData)
+    
+    const newUser = {
+      id: docRef.id,
+      ...newUserData,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_login: new Date().toISOString()
+    }
 
     return NextResponse.json({ user: newUser }, { status: 201 })
   } catch (error) {
@@ -50,9 +91,19 @@ export async function GET(request: NextRequest) {
     const email = searchParams.get('email')
     
     if (email) {
-      const user = await serverFirestoreService.users.getByEmail(email)
-      if (user) {
-        return NextResponse.json({ user })
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email))
+      const snapshot = await getDocs(usersQuery)
+      
+      if (!snapshot.empty) {
+        const userDoc = snapshot.docs[0]
+        const userData = {
+          id: userDoc.id,
+          ...userDoc.data(),
+          created_at: userDoc.data().created_at?.toDate?.()?.toISOString() || userDoc.data().created_at,
+          updated_at: userDoc.data().updated_at?.toDate?.()?.toISOString() || userDoc.data().updated_at,
+          last_login: userDoc.data().last_login?.toDate?.()?.toISOString() || userDoc.data().last_login
+        }
+        return NextResponse.json({ user: userData })
       } else {
         return NextResponse.json({ error: "User not found" }, { status: 404 })
       }

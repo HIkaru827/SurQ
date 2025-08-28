@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth'
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -207,35 +208,39 @@ const levelInfo = {
 
 export default function ProfilePage() {
   const router = useRouter()
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const { user, userProfile, loading: authLoading } = useAuth()
+  const [localProfile, setLocalProfile] = useState<UserProfile | null>(null)
   const [userSurveys, setUserSurveys] = useState<Survey[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchUserData()
-    fetchUserSurveys()
-  }, [])
+    if (!authLoading) {
+      if (!user) {
+        // 認証されていない場合はログインページにリダイレクト
+        router.push('/login')
+        return
+      }
+      fetchUserData()
+      fetchUserSurveys()
+    }
+  }, [user, authLoading, router])
 
   const fetchUserData = async () => {
     try {
-      // ローカルストレージからログインユーザー情報を取得
-      const currentUserData = localStorage.getItem('currentUser')
-      let loggedInUser = null
-      
-      if (currentUserData) {
-        try {
-          loggedInUser = JSON.parse(currentUserData)
-        } catch (e) {
-          console.error('Error parsing user data:', e)
-        }
-      }
-
-      if (!loggedInUser?.email) {
+      // Firebase認証からユーザー情報を取得
+      if (!user?.email) {
         throw new Error('No user logged in')
       }
 
-      // Firebaseからユーザーデータを取得
-      const userResponse = await fetch(`/api/users?email=${encodeURIComponent(loggedInUser.email)}`)
+      // Auth contextからユーザーデータを使用
+      if (userProfile) {
+        setLocalProfile(userProfile)
+        setLoading(false)
+        return
+      }
+
+      // APIからユーザーデータを取得（必要に応じて）
+      const userResponse = await fetch(`/api/users?email=${encodeURIComponent(user.email)}`)
       let firestoreUser = null
       
       if (userResponse.ok) {
@@ -252,8 +257,9 @@ export default function ProfilePage() {
       if (surveyResponse.ok) {
         const data = await surveyResponse.json()
         // 現在のユーザーが作成したアンケートのみフィルタリング
+        const userId = user.uid || firestoreUser?.id || 'anonymous-user'
         const userSurveys = data.surveys.filter((survey: any) => 
-          survey.creator_id === firestoreUser?.id || survey.creator_id === 'anonymous-user'
+          survey.creator_id === userId || survey.creator_id === 'anonymous-user'
         )
         
         surveysCreated = userSurveys.length
@@ -262,28 +268,28 @@ export default function ProfilePage() {
       }
 
       const userData: UserProfile = {
-        id: firestoreUser?.id || 'current-user',
-        name: firestoreUser?.name || loggedInUser.name || 'ユーザー',
-        email: firestoreUser?.email || loggedInUser.email || 'user@example.com',
-        avatar_url: firestoreUser?.avatar_url || undefined,
+        id: user.uid || firestoreUser?.id || 'current-user',
+        name: user.displayName || firestoreUser?.name || 'ユーザー',
+        email: user.email || firestoreUser?.email || 'user@example.com',
+        avatar_url: user.photoURL || firestoreUser?.avatar_url || undefined,
         points: totalPoints,
         level: Math.floor(totalPoints / 100) + 1,
         badges: surveysCreated > 0 ? ['初回作成'] : [],
         surveys_created: surveysCreated,
         surveys_answered: firestoreUser?.surveys_answered || 0,
         total_responses_received: totalResponses,
-        joined_at: firestoreUser?.created_at || loggedInUser?.loginTime || new Date().toISOString()
+        joined_at: firestoreUser?.created_at || new Date().toISOString()
       }
 
-      setUserProfile(userData)
+      setLocalProfile(userData)
     } catch (error) {
       console.error('Error fetching user data:', error)
       // フォールバック用の基本データ
       const userData: UserProfile = {
-        id: 'current-user',
-        name: 'ユーザー',
-        email: 'user@example.com',
-        avatar_url: undefined,
+        id: user?.uid || 'current-user',
+        name: user?.displayName || 'ユーザー',
+        email: user?.email || 'user@example.com',
+        avatar_url: user?.photoURL || undefined,
         points: 0,
         level: 1,
         badges: [],
@@ -292,23 +298,22 @@ export default function ProfilePage() {
         total_responses_received: 0,
         joined_at: new Date().toISOString()
       }
-      setUserProfile(userData)
+      setLocalProfile(userData)
+    } finally {
+      setLoading(false)
     }
   }
 
   const fetchUserSurveys = async () => {
     try {
-      // 現在のユーザー情報を取得
-      const currentUserData = localStorage.getItem('currentUser')
-      if (!currentUserData) {
+      // Firebase認証からユーザーIDを取得
+      if (!user?.uid) {
         setUserSurveys([])
-        setLoading(false)
         return
       }
       
-      const user = JSON.parse(currentUserData)
       // ユーザー自身のアンケートのみを取得
-      const response = await fetch(`/api/surveys?creator_id=${user.id}&include_unpublished=true`)
+      const response = await fetch(`/api/surveys?creator_id=${user.uid}&include_unpublished=true`)
       if (response.ok) {
         const data = await response.json()
         setUserSurveys(data.surveys || [])
@@ -357,17 +362,17 @@ export default function ProfilePage() {
   }
 
   const getProgressToNextLevel = () => {
-    if (!userProfile) return 0
-    const pointsForCurrentLevel = userProfile.level * 100
-    const pointsForNextLevel = (userProfile.level + 1) * 100
-    const currentProgress = userProfile.points - pointsForCurrentLevel
+    if (!localProfile) return 0
+    const pointsForCurrentLevel = localProfile.level * 100
+    const pointsForNextLevel = (localProfile.level + 1) * 100
+    const currentProgress = localProfile.points - pointsForCurrentLevel
     const totalNeeded = pointsForNextLevel - pointsForCurrentLevel
     return Math.min(100, (currentProgress / totalNeeded) * 100)
   }
 
   const getCurrentLevelName = () => {
-    if (!userProfile) return 'ブロンズ'
-    const points = userProfile.points
+    if (!localProfile) return 'ブロンズ'
+    const points = localProfile.points
     if (points >= 10000) return 'ダイヤモンド'
     if (points >= 5000) return 'プラチナ'
     if (points >= 2000) return 'ゴールド'
@@ -403,22 +408,37 @@ export default function ProfilePage() {
     }
   }
 
-  if (loading) {
+  // 認証チェックとローディング状態を統合
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">読み込み中...</div>
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="text-muted-foreground">読み込み中...</div>
+        </div>
       </div>
     )
   }
 
-  if (!userProfile) {
+  // ユーザーが認証されていない場合（すでにリダイレクトされているはず）
+  if (!user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-4">プロフィールが見つかりません</h2>
-          <Link href="/">
-            <Button>ホームに戻る</Button>
-          </Link>
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="text-muted-foreground">認証情報を確認中...</div>
+        </div>
+      </div>
+    )
+  }
+
+  // プロフィールデータがまだ取得されていない場合
+  if (!localProfile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="text-muted-foreground">プロフィールを読み込み中...</div>
         </div>
       </div>
     )
@@ -436,7 +456,12 @@ export default function ProfilePage() {
                 戻る
               </Link>
             </Button>
-            <h1 className="font-semibold text-foreground">プロフィール</h1>
+            <div className="flex items-center space-x-4">
+              <h1 className="font-semibold text-foreground">プロフィール</h1>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                {localProfile.points.toLocaleString()}pt
+              </Badge>
+            </div>
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="sm">
@@ -486,14 +511,26 @@ export default function ProfilePage() {
               <CardContent className="pt-6">
                 <div className="text-center space-y-4">
                   <Avatar className="w-20 h-20 mx-auto">
-                    <AvatarImage src={userProfile.avatar_url || "/placeholder.svg"} alt={userProfile.name} />
-                    <AvatarFallback className="text-2xl">{userProfile.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={localProfile.avatar_url || "/placeholder.svg"} alt={localProfile.name} />
+                    <AvatarFallback className="text-2xl">{localProfile.name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <h2 className="text-xl font-bold text-foreground">{userProfile.name}</h2>
-                    <p className="text-muted-foreground">{userProfile.email}</p>
-                    <p className="text-sm text-muted-foreground mt-1">参加日: {formatDate(userProfile.joined_at)}</p>
+                    <h2 className="text-xl font-bold text-foreground">{localProfile.name}</h2>
+                    <p className="text-muted-foreground">{localProfile.email}</p>
+                    <p className="text-sm text-muted-foreground mt-1">参加日: {formatDate(localProfile.joined_at)}</p>
                   </div>
+                  
+                  {/* 保有ポイント表示 */}
+                  <Card className="bg-primary/5 border-primary/20">
+                    <CardContent className="p-4 text-center">
+                      <div className="flex items-center justify-center space-x-2 mb-2">
+                        <Star className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium text-muted-foreground">保有ポイント</span>
+                      </div>
+                      <div className="text-3xl font-bold text-primary">{localProfile.points.toLocaleString()}</div>
+                      <div className="text-sm text-muted-foreground mt-1">ポイント</div>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>
@@ -507,21 +544,20 @@ export default function ProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className={cn("text-white", currentLevelInfo.color)}>
+                <div className="text-center">
+                  <Badge variant="secondary" className={cn("text-white text-lg px-4 py-2", currentLevelInfo.color)}>
                     {currentLevelName}
                   </Badge>
-                  <span className="text-2xl font-bold text-primary">{userProfile.points.toLocaleString()}</span>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>次のレベルまで</span>
-                    <span className="font-medium">{((userProfile.level + 1) * 100 - userProfile.points)}pt</span>
+                    <span className="font-medium">{((localProfile.level + 1) * 100 - localProfile.points)}pt</span>
                   </div>
                   <Progress value={levelProgress} className="h-3" />
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Lv.{userProfile.level}</span>
-                    <span>Lv.{userProfile.level + 1}</span>
+                    <span>Lv.{localProfile.level}</span>
+                    <span>Lv.{localProfile.level + 1}</span>
                   </div>
                 </div>
               </CardContent>
@@ -535,19 +571,19 @@ export default function ProfilePage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{userProfile.surveys_answered}</div>
+                    <div className="text-2xl font-bold text-primary">{localProfile.surveys_answered}</div>
                     <div className="text-xs text-muted-foreground">回答数</div>
                   </div>
                   <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{userProfile.surveys_created}</div>
+                    <div className="text-2xl font-bold text-primary">{localProfile.surveys_created}</div>
                     <div className="text-xs text-muted-foreground">作成数</div>
                   </div>
                   <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{userProfile.total_responses_received}</div>
+                    <div className="text-2xl font-bold text-primary">{localProfile.total_responses_received}</div>
                     <div className="text-xs text-muted-foreground">総回答数</div>
                   </div>
                   <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">Lv.{userProfile.level}</div>
+                    <div className="text-2xl font-bold text-primary">Lv.{localProfile.level}</div>
                     <div className="text-xs text-muted-foreground">レベル</div>
                   </div>
                 </div>
@@ -703,7 +739,7 @@ export default function ProfilePage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs text-muted-foreground">総アンケート数</p>
-                          <p className="text-lg font-bold text-foreground">{userProfile?.surveys_created || 0}</p>
+                          <p className="text-lg font-bold text-foreground">{localProfile?.surveys_created || 0}</p>
                         </div>
                         <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                           <BarChart3 className="w-4 h-4 text-primary" />
@@ -717,7 +753,7 @@ export default function ProfilePage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs text-muted-foreground">総回答数</p>
-                          <p className="text-lg font-bold text-foreground">{userProfile?.total_responses_received || 0}</p>
+                          <p className="text-lg font-bold text-foreground">{localProfile?.total_responses_received || 0}</p>
                         </div>
                         <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                           <Users className="w-4 h-4 text-primary" />
@@ -732,8 +768,8 @@ export default function ProfilePage() {
                         <div>
                           <p className="text-xs text-muted-foreground">平均回答数</p>
                           <p className="text-lg font-bold text-foreground">
-                            {userProfile?.surveys_created && userProfile.surveys_created > 0 
-                              ? Math.round(userProfile.total_responses_received / userProfile.surveys_created)
+                            {localProfile?.surveys_created && localProfile.surveys_created > 0 
+                              ? Math.round(localProfile.total_responses_received / localProfile.surveys_created)
                               : 0
                             }
                           </p>
@@ -750,7 +786,7 @@ export default function ProfilePage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs text-muted-foreground">総ポイント</p>
-                          <p className="text-lg font-bold text-foreground">{userProfile?.points || 0}</p>
+                          <p className="text-lg font-bold text-foreground">{localProfile?.points || 0}</p>
                         </div>
                         <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                           <Trophy className="w-4 h-4 text-primary" />
@@ -942,12 +978,12 @@ export default function ProfilePage() {
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">総回答数</span>
-                          <span className="font-semibold">{userProfile.surveys_answered}</span>
+                          <span className="font-semibold">{localProfile.surveys_answered}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">平均獲得ポイント</span>
                           <span className="font-semibold">
-                            {Math.round(userProfile.points / userProfile.surveys_answered)}pt
+                            {Math.round(localProfile.points / localProfile.surveys_answered)}pt
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -969,16 +1005,16 @@ export default function ProfilePage() {
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">作成したアンケート</span>
-                          <span className="font-semibold">{userProfile.surveys_created}</span>
+                          <span className="font-semibold">{localProfile.surveys_created}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">総回答数</span>
-                          <span className="font-semibold">{userProfile.total_responses_received}</span>
+                          <span className="font-semibold">{localProfile.total_responses_received}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">平均回答数</span>
                           <span className="font-semibold">
-                            {Math.round(userProfile.total_responses_received / userProfile.surveys_created)}
+                            {Math.round(localProfile.total_responses_received / localProfile.surveys_created)}
                           </span>
                         </div>
                       </div>

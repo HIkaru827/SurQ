@@ -16,10 +16,20 @@ const firebaseConfig = {
 // Debug: Check if config is properly loaded
 if (typeof window !== 'undefined') {
   console.log('Firebase config loaded:', {
-    apiKey: firebaseConfig.apiKey ? '***' : 'MISSING',
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId
+    apiKey: firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 10)}...` : 'MISSING',
+    authDomain: firebaseConfig.authDomain || 'MISSING',
+    projectId: firebaseConfig.projectId || 'MISSING',
+    environment: process.env.NODE_ENV
   })
+  
+  // Check if any config values are missing
+  const missingKeys = Object.entries(firebaseConfig)
+    .filter(([key, value]) => !value)
+    .map(([key]) => key)
+  
+  if (missingKeys.length > 0) {
+    console.error('Missing Firebase config keys:', missingKeys)
+  }
 }
 
 // Initialize Firebase (avoid multiple initialization)
@@ -30,16 +40,25 @@ let storage: FirebaseStorage | undefined
 
 // Initialize Firebase only on client side
 if (typeof window !== 'undefined') {
-  // Check if Firebase is already initialized
-  if (!getApps().length) {
-    app = initializeApp(firebaseConfig)
-  } else {
-    app = getApps()[0]
-  }
+  // Validate config before initializing
+  const requiredKeys = ['apiKey', 'authDomain', 'projectId']
+  const missingRequired = requiredKeys.filter(key => !firebaseConfig[key as keyof typeof firebaseConfig])
   
-  auth = getAuth(app)
-  db = getFirestore(app)
-  storage = getStorage(app)
+  if (missingRequired.length > 0) {
+    console.error('Cannot initialize Firebase - missing required config:', missingRequired)
+    // Don't initialize Firebase if critical config is missing
+  } else {
+    // Check if Firebase is already initialized
+    if (!getApps().length) {
+      app = initializeApp(firebaseConfig)
+    } else {
+      app = getApps()[0]
+    }
+    
+    auth = getAuth(app)
+    db = getFirestore(app)
+    storage = getStorage(app)
+  }
 } else {
   // Server side - create empty app reference
   app = {} as FirebaseApp

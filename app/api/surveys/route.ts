@@ -1,6 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { calculateSurveyPoints } from "@/lib/points"
-import { serverFirestoreService } from "@/lib/firebase-admin"
+import { initializeApp, getApps } from "firebase/app"
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp } from "firebase/firestore"
+
+// Firebase client config for server-side usage
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+}
+
+// Initialize Firebase for server-side API routes
+let app
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig)
+} else {
+  app = getApps()[0]
+}
+
+const db = getFirestore(app)
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,15 +29,39 @@ export async function GET(request: NextRequest) {
     const includeUnpublished = searchParams.get('include_unpublished') === 'true'
     const creatorId = searchParams.get('creator_id')
     
-    let surveys
+    let surveysQuery
     
     if (creatorId) {
       // 特定のユーザーのアンケートのみ（公開・未公開問わず）
-      surveys = await serverFirestoreService.surveys.getUserSurveys(creatorId)
-    } else {
+      surveysQuery = query(
+        collection(db, 'surveys'),
+        where('creator_id', '==', creatorId)
+      )
+    } else if (!includeUnpublished) {
       // 公開されたアンケートのみを返す（デフォルト）
-      surveys = await serverFirestoreService.surveys.getPublished()
+      surveysQuery = query(
+        collection(db, 'surveys'),
+        where('is_published', '==', true)
+      )
+    } else {
+      // 全てのアンケート（orderByのみ）
+      surveysQuery = query(collection(db, 'surveys'))
     }
+    
+    const snapshot = await getDocs(surveysQuery)
+    const surveys = snapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at,
+        updated_at: doc.data().updated_at?.toDate?.()?.toISOString() || doc.data().updated_at
+      }))
+      .sort((a, b) => {
+        // 手動でcreated_atで降順ソート
+        const dateA = new Date(a.created_at).getTime()
+        const dateB = new Date(b.created_at).getTime()
+        return dateB - dateA
+      })
     
     return NextResponse.json({ surveys })
   } catch (error) {
@@ -42,13 +87,24 @@ export async function POST(request: NextRequest) {
       questions: body.questions || [],
       is_published: body.is_published || false,
       respondent_points: points.respondentPoints,
-      creator_points: points.creatorPoints
+      creator_points: points.creatorPoints,
+      response_count: 0,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
     }
 
     // Firestoreに保存
-    const newSurvey = await serverFirestoreService.surveys.create(surveyData)
+    const docRef = await addDoc(collection(db, 'surveys'), surveyData)
+    
+    // 作成されたドキュメントを取得して返す
+    const createdSurvey = {
+      id: docRef.id,
+      ...surveyData,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
 
-    return NextResponse.json({ survey: newSurvey }, { status: 201 })
+    return NextResponse.json({ survey: createdSurvey }, { status: 201 })
   } catch (error) {
     console.error('Error creating survey:', error)
     return NextResponse.json({ 
