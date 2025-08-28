@@ -16,8 +16,7 @@ const nextConfig = {
   serverExternalPackages: [],
   // 開発時のタイムアウトを延長
   devIndicators: {
-    buildActivity: false,
-    buildActivityPosition: 'bottom-right',
+    position: 'bottom-left',
   },
   webpack: (config, { dev, isServer }) => {
     if (!isServer) {

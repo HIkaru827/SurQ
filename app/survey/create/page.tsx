@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -108,7 +108,7 @@ const questionTemplates = [
   },
 ]
 
-export default function CreateSurveyPage() {
+function CreateSurveyPageInner() {
   const searchParams = useSearchParams()
   const editSurveyId = searchParams.get('edit')
   
@@ -823,5 +823,20 @@ export default function CreateSurveyPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function CreateSurveyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-muted-foreground">読み込み中...</p>
+        </div>
+      </div>
+    }>
+      <CreateSurveyPageInner />
+    </Suspense>
   )
 }
