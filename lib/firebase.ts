@@ -13,6 +13,15 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
+// Debug: Check if config is properly loaded
+if (typeof window !== 'undefined') {
+  console.log('Firebase config loaded:', {
+    apiKey: firebaseConfig.apiKey ? '***' : 'MISSING',
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId
+  })
+}
+
 // Initialize Firebase (avoid multiple initialization)
 let app: FirebaseApp
 let auth: Auth | undefined

@@ -48,7 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     if (!auth) {
-      console.warn('Firebase auth not initialized')
+      console.warn('Firebase auth not initialized - running without authentication')
       setLoading(false)
       return
     }
