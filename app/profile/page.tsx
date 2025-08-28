@@ -1,0 +1,1018 @@
+"use client"
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { toast } from "sonner"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Progress } from "@/components/ui/progress"
+import { 
+  User, 
+  Settings, 
+  Trophy, 
+  Star, 
+  MessageSquare, 
+  BarChart3,
+  Edit,
+  Plus,
+  Eye,
+  Users,
+  ArrowLeft,
+  Calendar,
+  Target,
+  TrendingUp,
+  Award,
+  Crown,
+  Zap,
+  Medal,
+  LogOut,
+  Clock,
+  Download,
+  Share2,
+  RefreshCw,
+  MoreHorizontal,
+  Trash2
+} from 'lucide-react'
+import { cn } from "@/lib/utils"
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts"
+
+interface Survey {
+  id: string
+  title: string
+  description: string | null
+  questions: any[]
+  is_published: boolean
+  response_count: number
+  respondent_points: number
+  creator_points: number
+  created_at: string
+}
+
+interface UserProfile {
+  id: string
+  name: string
+  email: string
+  avatar_url?: string
+  points: number
+  level: number
+  badges: string[]
+  surveys_created: number
+  surveys_answered: number
+  total_responses_received: number
+  joined_at: string
+}
+
+const badges = [
+  {
+    id: "first-survey",
+    name: "初回回答",
+    description: "初めてアンケートに回答しました",
+    icon: Target,
+    color: "bg-blue-500",
+    earned: true,
+    earnedDate: "2024年1月15日",
+  },
+  {
+    id: "survey-master",
+    name: "アンケートマスター",
+    description: "50回以上アンケートに回答",
+    icon: Trophy,
+    color: "bg-yellow-500",
+    earned: false,
+    progress: 47,
+    target: 50,
+  },
+  {
+    id: "creator",
+    name: "クリエイター",
+    description: "初めてアンケートを作成しました",
+    icon: Trophy,
+    color: "bg-purple-500",
+    earned: true,
+    earnedDate: "2024年2月3日",
+  },
+  {
+    id: "streak-week",
+    name: "継続の力",
+    description: "7日連続でアンケートに回答",
+    icon: Star,
+    color: "bg-orange-500",
+    earned: true,
+    earnedDate: "2024年2月20日",
+  },
+  {
+    id: "popular-creator",
+    name: "人気クリエイター",
+    description: "作成したアンケートが100回以上回答された",
+    icon: Trophy,
+    color: "bg-pink-500",
+    earned: true,
+    earnedDate: "2024年3月5日",
+  },
+  {
+    id: "feedback-king",
+    name: "フィードバック王",
+    description: "100回以上アンケートに回答",
+    icon: Trophy,
+    color: "bg-green-500",
+    earned: false,
+    progress: 47,
+    target: 100,
+  },
+]
+
+const recentActivity = [
+  {
+    type: "survey_completed",
+    title: "カフェの利用体験に関するアンケート",
+    points: 50,
+    date: "2時間前",
+  },
+  {
+    type: "badge_earned",
+    title: "人気クリエイター バッジを獲得",
+    points: 100,
+    date: "1日前",
+  },
+  {
+    type: "survey_created",
+    title: "新商品に関するアンケートを作成",
+    points: 25,
+    date: "3日前",
+  },
+  {
+    type: "survey_completed",
+    title: "働き方に関するアンケート",
+    points: 75,
+    date: "5日前",
+  },
+]
+
+// Mock analytics data
+const mockAnalytics = {
+  overview: {
+    totalSurveys: 0,
+    totalResponses: 0,
+    avgCompletionRate: 0,
+    avgResponseTime: "0分",
+  },
+  responsesTrend: [
+    { date: "3/1", responses: 0, completions: 0 },
+    { date: "3/2", responses: 0, completions: 0 },
+    { date: "3/3", responses: 0, completions: 0 },
+    { date: "3/4", responses: 0, completions: 0 },
+    { date: "3/5", responses: 0, completions: 0 },
+    { date: "3/6", responses: 0, completions: 0 },
+    { date: "3/7", responses: 0, completions: 0 },
+  ],
+  demographics: {
+    age: [
+      { name: "18-24", value: 0, color: "#059669" },
+      { name: "25-34", value: 0, color: "#10b981" },
+      { name: "35-44", value: 0, color: "#34d399" },
+      { name: "45-54", value: 0, color: "#6ee7b7" },
+      { name: "55+", value: 0, color: "#a7f3d0" },
+    ],
+  },
+}
+
+const levelInfo = {
+  ブロンズ: { min: 0, max: 500, color: "bg-amber-600" },
+  シルバー: { min: 500, max: 2000, color: "bg-gray-400" },
+  ゴールド: { min: 2000, max: 5000, color: "bg-yellow-500" },
+  プラチナ: { min: 5000, max: 10000, color: "bg-blue-400" },
+  ダイヤモンド: { min: 10000, max: Number.POSITIVE_INFINITY, color: "bg-purple-500" },
+}
+
+export default function ProfilePage() {
+  const router = useRouter()
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [userSurveys, setUserSurveys] = useState<Survey[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchUserData()
+    fetchUserSurveys()
+  }, [])
+
+  const fetchUserData = async () => {
+    try {
+      // ローカルストレージからログインユーザー情報を取得
+      const currentUserData = localStorage.getItem('currentUser')
+      let loggedInUser = null
+      
+      if (currentUserData) {
+        try {
+          loggedInUser = JSON.parse(currentUserData)
+        } catch (e) {
+          console.error('Error parsing user data:', e)
+        }
+      }
+
+      if (!loggedInUser?.email) {
+        throw new Error('No user logged in')
+      }
+
+      // Firebaseからユーザーデータを取得
+      const userResponse = await fetch(`/api/users?email=${encodeURIComponent(loggedInUser.email)}`)
+      let firestoreUser = null
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        firestoreUser = userData.user
+      }
+
+      // 実際のアンケート数を取得してユーザーデータに反映
+      const surveyResponse = await fetch('/api/surveys')
+      let surveysCreated = 0
+      let totalPoints = 0
+      let totalResponses = 0
+      
+      if (surveyResponse.ok) {
+        const data = await surveyResponse.json()
+        // 現在のユーザーが作成したアンケートのみフィルタリング
+        const userSurveys = data.surveys.filter((survey: any) => 
+          survey.creator_id === firestoreUser?.id || survey.creator_id === 'anonymous-user'
+        )
+        
+        surveysCreated = userSurveys.length
+        totalPoints = userSurveys.reduce((sum: number, survey: any) => sum + survey.creator_points, 0)
+        totalResponses = userSurveys.reduce((sum: number, survey: any) => sum + survey.response_count, 0)
+      }
+
+      const userData: UserProfile = {
+        id: firestoreUser?.id || 'current-user',
+        name: firestoreUser?.name || loggedInUser.name || 'ユーザー',
+        email: firestoreUser?.email || loggedInUser.email || 'user@example.com',
+        avatar_url: firestoreUser?.avatar_url || undefined,
+        points: totalPoints,
+        level: Math.floor(totalPoints / 100) + 1,
+        badges: surveysCreated > 0 ? ['初回作成'] : [],
+        surveys_created: surveysCreated,
+        surveys_answered: firestoreUser?.surveys_answered || 0,
+        total_responses_received: totalResponses,
+        joined_at: firestoreUser?.created_at || loggedInUser?.loginTime || new Date().toISOString()
+      }
+
+      setUserProfile(userData)
+    } catch (error) {
+      console.error('Error fetching user data:', error)
+      // フォールバック用の基本データ
+      const userData: UserProfile = {
+        id: 'current-user',
+        name: 'ユーザー',
+        email: 'user@example.com',
+        avatar_url: undefined,
+        points: 0,
+        level: 1,
+        badges: [],
+        surveys_created: 0,
+        surveys_answered: 0,
+        total_responses_received: 0,
+        joined_at: new Date().toISOString()
+      }
+      setUserProfile(userData)
+    }
+  }
+
+  const fetchUserSurveys = async () => {
+    try {
+      // 現在のユーザー情報を取得
+      const currentUserData = localStorage.getItem('currentUser')
+      if (!currentUserData) {
+        setUserSurveys([])
+        setLoading(false)
+        return
+      }
+      
+      const user = JSON.parse(currentUserData)
+      // ユーザー自身のアンケートのみを取得
+      const response = await fetch(`/api/surveys?creator_id=${user.id}&include_unpublished=true`)
+      if (response.ok) {
+        const data = await response.json()
+        setUserSurveys(data.surveys || [])
+      }
+    } catch (error) {
+      console.error('Error fetching user surveys:', error)
+      setUserSurveys([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+
+  const handleDeleteSurvey = async (surveyId: string, hasResponses: boolean) => {
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        // アンケート一覧から削除
+        setUserSurveys(prev => prev.filter(survey => survey.id !== surveyId))
+        
+        const message = hasResponses 
+          ? 'アンケートが削除されました（ポイント返還なし）'
+          : 'アンケートが削除され、ポイントが返還されました'
+        
+        toast.success(message)
+        
+        // プロフィール情報を再読み込み
+        await fetchUserData()
+      } else {
+        throw new Error('削除に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error deleting survey:', error)
+      toast.error('削除に失敗しました')
+    }
+  }
+
+  const getProgressToNextLevel = () => {
+    if (!userProfile) return 0
+    const pointsForCurrentLevel = userProfile.level * 100
+    const pointsForNextLevel = (userProfile.level + 1) * 100
+    const currentProgress = userProfile.points - pointsForCurrentLevel
+    const totalNeeded = pointsForNextLevel - pointsForCurrentLevel
+    return Math.min(100, (currentProgress / totalNeeded) * 100)
+  }
+
+  const getCurrentLevelName = () => {
+    if (!userProfile) return 'ブロンズ'
+    const points = userProfile.points
+    if (points >= 10000) return 'ダイヤモンド'
+    if (points >= 5000) return 'プラチナ'
+    if (points >= 2000) return 'ゴールド'
+    if (points >= 500) return 'シルバー'
+    return 'ブロンズ'
+  }
+
+  const levelProgress = getProgressToNextLevel()
+  const currentLevelName = getCurrentLevelName()
+  const currentLevelInfo = levelInfo[currentLevelName as keyof typeof levelInfo]
+
+  const handleLogout = () => {
+    try {
+      // セッションやローカルストレージをクリア
+      localStorage.removeItem('user')
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('currentUser') // ログインユーザー情報もクリア
+      
+      // セッションストレージもクリア
+      sessionStorage.clear()
+      
+      // 成功通知
+      toast.success('ログアウトしました')
+      
+      // 少し遅延してからリダイレクト（通知が見えるように）
+      setTimeout(() => {
+        router.push('/')
+      }, 1000)
+      
+    } catch (error) {
+      console.error('ログアウトエラー:', error)
+      toast.error('ログアウトに失敗しました')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-muted-foreground">読み込み中...</div>
+      </div>
+    )
+  }
+
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-4">プロフィールが見つかりません</h2>
+          <Link href="/">
+            <Button>ホームに戻る</Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-background/95 backdrop-blur">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/app">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                戻る
+              </Link>
+            </Button>
+            <h1 className="font-semibold text-foreground">プロフィール</h1>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>設定</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Edit className="w-4 h-4 mr-2" />
+                      プロフィール編集
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start">
+                      <Settings className="w-4 h-4 mr-2" />
+                      通知設定
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start">
+                      <Eye className="w-4 h-4 mr-2" />
+                      プライバシー設定
+                    </Button>
+                  </div>
+                  <hr className="my-4" />
+                  <Button 
+                    variant="destructive" 
+                    className="w-full justify-start"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    ログアウト
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Profile Info */}
+          <div className="lg:col-span-1 space-y-6">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <Avatar className="w-20 h-20 mx-auto">
+                    <AvatarImage src={userProfile.avatar_url || "/placeholder.svg"} alt={userProfile.name} />
+                    <AvatarFallback className="text-2xl">{userProfile.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground">{userProfile.name}</h2>
+                    <p className="text-muted-foreground">{userProfile.email}</p>
+                    <p className="text-sm text-muted-foreground mt-1">参加日: {formatDate(userProfile.joined_at)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Level Progress */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Trophy className="w-5 h-5 text-primary" />
+                  <span>レベル</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Badge variant="secondary" className={cn("text-white", currentLevelInfo.color)}>
+                    {currentLevelName}
+                  </Badge>
+                  <span className="text-2xl font-bold text-primary">{userProfile.points.toLocaleString()}</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>次のレベルまで</span>
+                    <span className="font-medium">{((userProfile.level + 1) * 100 - userProfile.points)}pt</span>
+                  </div>
+                  <Progress value={levelProgress} className="h-3" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Lv.{userProfile.level}</span>
+                    <span>Lv.{userProfile.level + 1}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle>統計</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">{userProfile.surveys_answered}</div>
+                    <div className="text-xs text-muted-foreground">回答数</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">{userProfile.surveys_created}</div>
+                    <div className="text-xs text-muted-foreground">作成数</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">{userProfile.total_responses_received}</div>
+                    <div className="text-xs text-muted-foreground">総回答数</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">Lv.{userProfile.level}</div>
+                    <div className="text-xs text-muted-foreground">レベル</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            <Tabs defaultValue="surveys" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="surveys">アンケート</TabsTrigger>
+                <TabsTrigger value="analytics">アナリティクス</TabsTrigger>
+                <TabsTrigger value="achievements">実績</TabsTrigger>
+                <TabsTrigger value="activity">アクティビティ</TabsTrigger>
+                <TabsTrigger value="stats">詳細統計</TabsTrigger>
+              </TabsList>
+
+              {/* Surveys Tab */}
+              <TabsContent value="surveys" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <MessageSquare className="w-5 h-5 text-primary" />
+                      <span>作成したアンケート</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {userSurveys.length === 0 ? (
+                      <div className="text-center py-8">
+                        <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">まだアンケートを作成していません</h3>
+                        <p className="text-muted-foreground mb-4">
+                          あなたの最初のアンケートを作成してみましょう
+                        </p>
+                        <Link href="/survey/create">
+                          <Button>
+                            <Plus className="w-4 h-4 mr-2" />
+                            アンケートを作成
+                          </Button>
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {userSurveys.map((survey) => (
+                          <div key={survey.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <h3 className="font-semibold text-foreground">{survey.title}</h3>
+                                  <Badge variant={survey.is_published ? "default" : "secondary"}>
+                                    {survey.is_published ? "公開中" : "下書き"}
+                                  </Badge>
+                                </div>
+                                {survey.description && (
+                                  <p className="text-sm text-muted-foreground mb-2">{survey.description}</p>
+                                )}
+                                <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                                  <span>質問数: {survey.questions.length}</span>
+                                  <span>回答数: {survey.response_count}</span>
+                                  <span>獲得ポイント: {survey.creator_points}pt</span>
+                                  <span>作成日: {formatDate(survey.created_at)}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {/* 詳細を見る */}
+                                    <DropdownMenuItem onClick={() => {
+                                      if (survey.is_published) {
+                                        // 公開済みの場合、アンケート詳細ページへ
+                                        window.open(`/survey/${survey.id}`, '_blank')
+                                      } else {
+                                        // 下書きの場合、編集ページへ
+                                        window.open(`/survey/create?edit=${survey.id}`, '_blank')
+                                      }
+                                    }}>
+                                      <Eye className="w-4 h-4 mr-2" />
+                                      詳細を見る
+                                    </DropdownMenuItem>
+                                    
+                                    {/* 編集する（回答者がゼロの場合のみ） */}
+                                    {survey.response_count === 0 && (
+                                      <DropdownMenuItem onClick={() => {
+                                        window.location.href = `/survey/create?edit=${survey.id}`
+                                      }}>
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        編集する
+                                      </DropdownMenuItem>
+                                    )}
+                                    
+                                    {/* 削除する */}
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem 
+                                          className="text-destructive focus:text-destructive"
+                                          onSelect={(e) => e.preventDefault()}
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          削除する
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>アンケートの削除</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            「{survey.title}」を削除しますか？
+                                            {survey.response_count === 0 ? (
+                                              <span className="block mt-2 text-green-600">
+                                                回答者がいないため、消費したポイント（{survey.creator_points}pt）が返還されます。
+                                              </span>
+                                            ) : (
+                                              <span className="block mt-2 text-red-600">
+                                                既に{survey.response_count}件の回答があるため、ポイントの返還はありません。
+                                              </span>
+                                            )}
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                                          <AlertDialogAction 
+                                            onClick={() => handleDeleteSurvey(survey.id, survey.response_count > 0)}
+                                            className="bg-destructive hover:bg-destructive/90"
+                                          >
+                                            削除する
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Analytics Tab */}
+              <TabsContent value="analytics" className="space-y-6">
+                {/* Overview Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">総アンケート数</p>
+                          <p className="text-lg font-bold text-foreground">{userProfile?.surveys_created || 0}</p>
+                        </div>
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                          <BarChart3 className="w-4 h-4 text-primary" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">総回答数</p>
+                          <p className="text-lg font-bold text-foreground">{userProfile?.total_responses_received || 0}</p>
+                        </div>
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                          <Users className="w-4 h-4 text-primary" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">平均回答数</p>
+                          <p className="text-lg font-bold text-foreground">
+                            {userProfile?.surveys_created && userProfile.surveys_created > 0 
+                              ? Math.round(userProfile.total_responses_received / userProfile.surveys_created)
+                              : 0
+                            }
+                          </p>
+                        </div>
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                          <Target className="w-4 h-4 text-primary" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">総ポイント</p>
+                          <p className="text-lg font-bold text-foreground">{userProfile?.points || 0}</p>
+                        </div>
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                          <Trophy className="w-4 h-4 text-primary" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {userSurveys.length > 0 ? (
+                  <div className="grid lg:grid-cols-2 gap-6">
+                    {/* Response Trends */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <TrendingUp className="w-4 h-4 text-primary" />
+                          <span className="text-sm">回答トレンド</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-48">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={mockAnalytics.responsesTrend}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="date" />
+                              <YAxis />
+                              <Tooltip />
+                              <Area
+                                type="monotone"
+                                dataKey="responses"
+                                stroke="#059669"
+                                fill="#059669"
+                                fillOpacity={0.6}
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Survey Performance */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <BarChart3 className="w-4 h-4 text-primary" />
+                          <span className="text-sm">アンケート別パフォーマンス</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-48">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={userSurveys.slice(0, 5)}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis 
+                                dataKey="title" 
+                                angle={-45} 
+                                textAnchor="end" 
+                                height={60}
+                                interval={0}
+                                fontSize={10}
+                              />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="response_count" fill="#059669" radius={[2, 2, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="p-8 text-center">
+                      <BarChart3 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">アナリティクスデータがありません</h3>
+                      <p className="text-muted-foreground mb-4">
+                        アンケートを作成して回答を収集すると、詳細な分析データが表示されます
+                      </p>
+                      <Link href="/survey/create">
+                        <Button>
+                          <Plus className="w-4 h-4 mr-2" />
+                          最初のアンケートを作成
+                        </Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              {/* Achievements Tab */}
+              <TabsContent value="achievements" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Trophy className="w-5 h-5 text-primary" />
+                      <span>バッジコレクション</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {badges.map((badge) => {
+                        const Icon = badge.icon
+                        return (
+                          <div
+                            key={badge.id}
+                            className={cn(
+                              "p-4 rounded-lg border transition-all",
+                              badge.earned ? "bg-primary/5 border-primary/20" : "bg-muted/30 border-border opacity-60",
+                            )}
+                          >
+                            <div className="flex items-start space-x-3">
+                              <div
+                                className={cn(
+                                  "w-12 h-12 rounded-full flex items-center justify-center",
+                                  badge.earned ? badge.color : "bg-muted",
+                                )}
+                              >
+                                <Icon className="w-6 h-6 text-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-foreground">{badge.name}</h3>
+                                <p className="text-sm text-muted-foreground">{badge.description}</p>
+                                {badge.earned ? (
+                                  <p className="text-xs text-primary mt-1">獲得日: {badge.earnedDate}</p>
+                                ) : badge.progress !== undefined ? (
+                                  <div className="mt-2 space-y-1">
+                                    <div className="flex justify-between text-xs">
+                                      <span>進捗</span>
+                                      <span>
+                                        {badge.progress}/{badge.target}
+                                      </span>
+                                    </div>
+                                    <Progress value={(badge.progress / badge.target!) * 100} className="h-2" />
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground mt-1">未獲得</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Activity Tab */}
+              <TabsContent value="activity" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Calendar className="w-5 h-5 text-primary" />
+                      <span>最近のアクティビティ</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {recentActivity.map((activity, index) => (
+                        <div key={index} className="flex items-center space-x-4 p-3 rounded-lg bg-muted/30">
+                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                            {activity.type === "survey_completed" && <Target className="w-5 h-5 text-primary" />}
+                            {activity.type === "badge_earned" && <Trophy className="w-5 h-5 text-primary" />}
+                            {activity.type === "survey_created" && <Plus className="w-5 h-5 text-primary" />}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">{activity.title}</p>
+                            <p className="text-sm text-muted-foreground">{activity.date}</p>
+                          </div>
+                          <Badge variant="secondary">+{activity.points}pt</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Stats Tab */}
+              <TabsContent value="stats" className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <BarChart3 className="w-5 h-5 text-primary" />
+                        <span>回答統計</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">総回答数</span>
+                          <span className="font-semibold">{userProfile.surveys_answered}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">平均獲得ポイント</span>
+                          <span className="font-semibold">
+                            {Math.round(userProfile.points / userProfile.surveys_answered)}pt
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">連続回答記録</span>
+                          <span className="font-semibold">7日</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Users className="w-5 h-5 text-primary" />
+                        <span>作成統計</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">作成したアンケート</span>
+                          <span className="font-semibold">{userProfile.surveys_created}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">総回答数</span>
+                          <span className="font-semibold">{userProfile.total_responses_received}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">平均回答数</span>
+                          <span className="font-semibold">
+                            {Math.round(userProfile.total_responses_received / userProfile.surveys_created)}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="md:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <TrendingUp className="w-5 h-5 text-primary" />
+                        <span>ランキング</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-center space-y-4">
+                        <div className="text-4xl font-bold text-primary">#42</div>
+                        <p className="text-muted-foreground">
+                          全{(1250).toLocaleString()}人中 42位
+                        </p>
+                        <div className="flex justify-center space-x-4">
+                          <Button variant="outline" size="sm">
+                            <Trophy className="w-4 h-4 mr-2" />
+                            ランキングを見る
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}

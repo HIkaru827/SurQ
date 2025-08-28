@@ -1,0 +1,321 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, ArrowRight, Trophy, Star, CheckCircle } from "lucide-react"
+import Link from "next/link"
+import { cn } from "@/lib/utils"
+
+// Mock survey data
+const mockSurvey = {
+  id: "1",
+  title: "カフェの利用体験に関するアンケート",
+  description: "あなたのカフェ利用体験について教えてください",
+  questions: [
+    {
+      id: 1,
+      type: "multiple-choice",
+      question: "どのくらいの頻度でカフェを利用しますか？",
+      options: ["毎日", "週に2-3回", "週に1回", "月に数回", "ほとんど利用しない"],
+    },
+    {
+      id: 2,
+      type: "rating",
+      question: "当店のサービスに満足していますか？",
+      scale: 5,
+    },
+    {
+      id: 3,
+      type: "multiple-choice",
+      question: "最も重視するポイントは何ですか？",
+      options: ["コーヒーの味", "価格", "雰囲気", "立地", "Wi-Fi環境"],
+    },
+    {
+      id: 4,
+      type: "text",
+      question: "改善してほしい点があれば教えてください",
+    },
+    {
+      id: 5,
+      type: "multiple-choice",
+      question: "また利用したいと思いますか？",
+      options: ["ぜひ利用したい", "機会があれば利用したい", "どちらでもない", "あまり利用したくない", "利用したくない"],
+    },
+  ],
+  pointsReward: 50,
+}
+
+export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
+  const [currentQuestion, setCurrentQuestion] = useState(0)
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [isCompleted, setIsCompleted] = useState(false)
+  const [showCompletion, setShowCompletion] = useState(false)
+  const [survey, setSurvey] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [surveyId, setSurveyId] = useState<string>('')
+
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params
+      setSurveyId(resolvedParams.id)
+      fetchSurvey(resolvedParams.id)
+    }
+    getParams()
+  }, [params])
+
+  const fetchSurvey = async (id: string) => {
+    try {
+      const response = await fetch(`/api/surveys/${id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setSurvey(data.survey)
+      } else if (response.status === 404) {
+        setError('アンケートが見つかりません')
+      } else {
+        setError('アンケートの読み込みに失敗しました')
+      }
+    } catch (error) {
+      console.error('Error fetching survey:', error)
+      setError('アンケートの読み込みに失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">アンケートを読み込んでいます...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !survey) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="p-6">
+            <h2 className="text-xl font-semibold mb-4">エラーが発生しました</h2>
+            <p className="text-muted-foreground mb-6">{error || 'アンケートが見つかりません'}</p>
+            <Link href="/app">
+              <Button>アプリに戻る</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const totalQuestions = survey.questions.length
+  const progress = ((currentQuestion + 1) / totalQuestions) * 100
+
+  const handleAnswer = (questionId: string, answer: string) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: answer }))
+  }
+
+  const handleNext = () => {
+    if (currentQuestion < totalQuestions - 1) {
+      setCurrentQuestion((prev) => prev + 1)
+    } else {
+      // Complete survey
+      setIsCompleted(true)
+      setTimeout(() => setShowCompletion(true), 500)
+    }
+  }
+
+  const handlePrevious = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion((prev) => prev - 1)
+    }
+  }
+
+  const currentQ = survey.questions[currentQuestion]
+  const currentAnswer = answers[currentQ?.id]
+  const canProceed = currentAnswer !== undefined && currentAnswer !== ""
+
+  if (isCompleted) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card
+          className={cn(
+            "w-full max-w-md text-center transition-all duration-700",
+            showCompletion ? "scale-100 opacity-100" : "scale-95 opacity-0",
+          )}
+        >
+          <CardHeader className="pb-4">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+              <Trophy className="w-10 h-10 text-primary" />
+            </div>
+            <CardTitle className="text-2xl text-primary">アンケート完了！</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <p className="text-muted-foreground">ご協力ありがとうございました</p>
+              <div className="flex items-center justify-center space-x-2">
+                <Badge variant="secondary" className="text-lg px-4 py-2">
+                  <Star className="w-4 h-4 mr-2 text-yellow-500" />+{survey.respondent_points} ポイント獲得
+                </Badge>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Button variant="outline" asChild className="w-full bg-transparent">
+                <Link href="/app">アプリに戻る</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-background/95 backdrop-blur">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/app">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                戻る
+              </Link>
+            </Button>
+            <div className="text-center">
+              <h1 className="font-semibold text-foreground">{survey.title}</h1>
+              <p className="text-sm text-muted-foreground">
+                {currentQuestion + 1} / {totalQuestions}
+              </p>
+            </div>
+            <div className="w-16" /> {/* Spacer for centering */}
+          </div>
+        </div>
+      </header>
+
+      {/* Progress Bar */}
+      <div className="container mx-auto px-4 py-4">
+        <Progress value={progress} className="h-2" />
+      </div>
+
+      {/* Question Content */}
+      <main className="container mx-auto px-4 py-8 max-w-2xl">
+        <Card className="border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl text-balance">{currentQ.question}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Multiple Choice Questions */}
+            {currentQ.type === "multiple-choice" && (
+              <RadioGroup
+                value={currentAnswer}
+                onValueChange={(value) => handleAnswer(currentQ.id, value)}
+                className="space-y-3"
+              >
+                {currentQ.options?.map((option, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <RadioGroupItem value={option} id={`option-${index}`} />
+                    <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
+                      {option}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            )}
+
+            {/* Yes/No Questions */}
+            {currentQ.type === "yes-no" && (
+              <RadioGroup
+                value={currentAnswer}
+                onValueChange={(value) => handleAnswer(currentQ.id, value)}
+                className="space-y-3"
+              >
+                <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="はい" id="yes" />
+                  <Label htmlFor="yes" className="flex-1 cursor-pointer text-base">はい</Label>
+                </div>
+                <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="いいえ" id="no" />
+                  <Label htmlFor="no" className="flex-1 cursor-pointer text-base">いいえ</Label>
+                </div>
+              </RadioGroup>
+            )}
+
+            {/* Rating Questions */}
+            {currentQ.type === "rating" && (
+              <div className="space-y-4">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>全く満足していない</span>
+                  <span>とても満足している</span>
+                </div>
+                <RadioGroup
+                  value={currentAnswer}
+                  onValueChange={(value) => handleAnswer(currentQ.id, value)}
+                  className="flex justify-center space-x-4"
+                >
+                  {Array.from({ length: currentQ.scale || 5 }, (_, i) => i + 1).map((rating) => (
+                    <div key={rating} className="flex flex-col items-center space-y-2">
+                      <RadioGroupItem value={rating.toString()} id={`rating-${rating}`} className="w-6 h-6" />
+                      <Label htmlFor={`rating-${rating}`} className="cursor-pointer text-lg font-semibold">
+                        {rating}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            )}
+
+            {/* Text Questions */}
+            {currentQ.type === "text" && (
+              <Textarea
+                placeholder="こちらにご意見をお聞かせください..."
+                value={currentAnswer || ""}
+                onChange={(e) => handleAnswer(currentQ.id, e.target.value)}
+                className="min-h-32 text-base"
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Navigation */}
+        <div className="flex justify-between items-center mt-8">
+          <Button
+            variant="outline"
+            onClick={handlePrevious}
+            disabled={currentQuestion === 0}
+            className="flex items-center bg-transparent"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            前の質問
+          </Button>
+
+          <Button onClick={handleNext} disabled={!canProceed} className="flex items-center">
+            {currentQuestion === totalQuestions - 1 ? (
+              <>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                完了
+              </>
+            ) : (
+              <>
+                次の質問
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </>
+            )}
+          </Button>
+        </div>
+      </main>
+    </div>
+  )
+}
