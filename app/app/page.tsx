@@ -21,6 +21,7 @@ interface Survey {
   creator_points: number
   created_at: string
   updated_at: string
+  has_answered?: boolean
 }
 
 export default function AppPage() {
@@ -28,7 +29,7 @@ export default function AppPage() {
   const [userSurveys, setUserSurveys] = useState<Survey[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
-  const { user, userProfile } = useAuth()
+  const { user, userProfile, refreshProfile } = useAuth()
   
   const isDevAccount = user?.email ? isDeveloperAccount(user.email) : false
 
@@ -42,6 +43,25 @@ export default function AppPage() {
       setLoading(false)
     })
   }, [])
+
+  useEffect(() => {
+    // ユーザーログイン後にアンケート回答状況を再チェック
+    if (user?.email && surveys.length > 0) {
+      checkAnsweredStatus(surveys)
+    }
+  }, [user?.email])
+
+  useEffect(() => {
+    // ページがフォーカスされた時にプロフィールを更新
+    const handleFocus = () => {
+      if (user) {
+        refreshProfile()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [user, refreshProfile])
 
   useEffect(() => {
     if (currentUser?.id) {
@@ -69,7 +89,8 @@ export default function AppPage() {
       if (cachedSurveys && cachedTime) {
         const cacheAge = Date.now() - parseInt(cachedTime)
         if (cacheAge < 30000) { // 30秒以内なら使用
-          setSurveys(JSON.parse(cachedSurveys))
+          const surveys = JSON.parse(cachedSurveys)
+          await checkAnsweredStatus(surveys)
           return
         }
       }
@@ -77,14 +98,45 @@ export default function AppPage() {
       const response = await fetch('/api/surveys')
       if (response.ok) {
         const data = await response.json()
-        setSurveys(data.surveys || [])
+        const surveys = data.surveys || []
+        
+        await checkAnsweredStatus(surveys)
         
         // キャッシュに保存
-        sessionStorage.setItem('cached_surveys', JSON.stringify(data.surveys || []))
+        sessionStorage.setItem('cached_surveys', JSON.stringify(surveys))
         sessionStorage.setItem('cached_surveys_time', Date.now().toString())
       }
     } catch (error) {
       console.error('Error fetching surveys:', error)
+    }
+  }
+
+  const checkAnsweredStatus = async (surveys: Survey[]) => {
+    if (!user?.email) {
+      setSurveys(surveys)
+      return
+    }
+
+    try {
+      // 各アンケートの回答状況をチェック
+      const surveysWithStatus = await Promise.all(
+        surveys.map(async (survey) => {
+          try {
+            const response = await fetch(`/api/surveys/${survey.id}/responses?email=${encodeURIComponent(user.email!)}`)
+            if (response.ok) {
+              const data = await response.json()
+              return { ...survey, has_answered: data.hasResponded }
+            }
+          } catch (error) {
+            console.error(`Error checking response for survey ${survey.id}:`, error)
+          }
+          return { ...survey, has_answered: false }
+        })
+      )
+      setSurveys(surveysWithStatus)
+    } catch (error) {
+      console.error('Error checking answered status:', error)
+      setSurveys(surveys)
     }
   }
 
@@ -122,24 +174,24 @@ export default function AppPage() {
               </div>
               <span className="text-xl font-bold text-foreground">SurQ</span>
             </div>
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex items-center space-x-1 sm:space-x-3">
               {userProfile && (
-                <div className="hidden sm:flex items-center space-x-2">
-                  <Badge variant="secondary" className={`font-medium ${isDevAccount ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-primary/10 text-primary border-primary/20'}`}>
+                <div className="flex items-center">
+                  <Badge variant="secondary" className={`font-medium text-xs sm:text-sm px-2 py-1 ${isDevAccount ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-primary/10 text-primary border-primary/20'}`}>
                     {isDevAccount ? '∞pt' : `${userProfile.points?.toLocaleString() || '0'}pt`}
                   </Badge>
                 </div>
               )}
               <Link href="/profile">
-                <Button variant="ghost" size="sm" className="sm:size-default">
-                  <User className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
-                  <span className="hidden sm:inline">{currentUser ? `${currentUser.name}さん` : 'マイページ'}</span>
+                <Button variant="ghost" size="sm" className="p-2 sm:px-3">
+                  <User className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline text-sm">{currentUser ? `${currentUser.name}さん` : 'マイページ'}</span>
                 </Button>
               </Link>
               <Button
                 variant="default"
                 size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground sm:size-default"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-2"
                 onClick={() => {
                   const surveysSection = document.getElementById('surveys')
                   if (surveysSection) {
@@ -147,17 +199,17 @@ export default function AppPage() {
                   }
                 }}
               >
-                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
-                <span className="text-sm sm:text-base">回答</span>
+                <MessageSquare className="w-4 h-4 mr-1" />
+                <span className="text-sm">回答</span>
               </Button>
               <Link href="/survey/create">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent sm:size-default"
+                  className="border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent px-3 py-2"
                 >
-                  <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
-                  <span className="text-sm sm:text-base">作成</span>
+                  <PlusCircle className="w-4 h-4 mr-1" />
+                  <span className="text-sm">作成</span>
                 </Button>
               </Link>
             </div>
@@ -171,57 +223,62 @@ export default function AppPage() {
           <div className="container mx-auto max-w-6xl">
             <div className="mb-8">
               <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">あなたのアンケート</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {userSurveys.map((survey) => (
                   <Card key={survey.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg line-clamp-1">{survey.title}</CardTitle>
-                        <Badge variant={survey.is_published ? "default" : "secondary"}>
+                    <CardHeader className="pb-3 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-sm sm:text-base lg:text-lg line-clamp-2 flex-1 leading-tight">
+                          {survey.title}
+                        </CardTitle>
+                        <Badge 
+                          variant={survey.is_published ? "default" : "secondary"}
+                          className="text-xs px-2 py-1 shrink-0"
+                        >
                           {survey.is_published ? "公開中" : "下書き"}
                         </Badge>
                       </div>
                       {survey.description && (
-                        <p className="text-muted-foreground text-sm line-clamp-2">
+                        <p className="text-muted-foreground text-xs sm:text-sm line-clamp-2 mt-1">
                           {survey.description}
                         </p>
                       )}
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-4 pt-0">
                       <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center space-x-2">
-                            <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
+                          <div className="flex items-center space-x-1 sm:space-x-2">
+                            <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
                             <span>{survey.questions?.length || 0}問</span>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <Users className="w-4 h-4 text-muted-foreground" />
+                          <div className="flex items-center space-x-1 sm:space-x-2">
+                            <Users className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
                             <span>{survey.response_count}回答</span>
                           </div>
                         </div>
                         
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Star className="w-4 h-4 text-yellow-500" />
-                            <span className="text-sm font-medium">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center space-x-1 sm:space-x-2">
+                            <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
+                            <span className="text-xs sm:text-sm font-medium">
                               {survey.creator_points}pt消費
                             </span>
                           </div>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs px-2 py-1">
                             {formatDate(survey.created_at)}
                           </Badge>
                         </div>
 
                         {survey.is_published ? (
                           <Link href={`/survey/${survey.id}`}>
-                            <Button className="w-full" variant="outline">
-                              アンケートを見る
+                            <Button className="w-full h-9 sm:h-10" variant="outline">
+                              <span className="text-xs sm:text-sm">アンケートを見る</span>
                             </Button>
                           </Link>
                         ) : (
                           <Link href={`/survey/create?edit=${survey.id}`}>
-                            <Button className="w-full" variant="outline">
-                              編集を続ける
+                            <Button className="w-full h-9 sm:h-10" variant="outline">
+                              <span className="text-xs sm:text-sm">編集を続ける</span>
                             </Button>
                           </Link>
                         )}
@@ -270,44 +327,51 @@ export default function AppPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
               {surveys.slice(0, 6).map((survey) => (
                 <Card key={survey.id} className="hover:shadow-lg transition-shadow border-0 shadow-md">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg line-clamp-2">{survey.title}</CardTitle>
+                  <CardHeader className="pb-3 p-4">
+                    <CardTitle className="text-base sm:text-lg line-clamp-2 leading-tight">{survey.title}</CardTitle>
                     {survey.description && (
-                      <p className="text-muted-foreground text-sm line-clamp-3">
+                      <p className="text-muted-foreground text-xs sm:text-sm line-clamp-2 sm:line-clamp-3 mt-1">
                         {survey.description}
                       </p>
                     )}
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-4 pt-0">
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center space-x-2">
-                          <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                      <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <div className="flex items-center space-x-1 sm:space-x-2">
+                          <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
                           <span>{survey.questions?.length || 0}問</span>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Users className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex items-center space-x-1 sm:space-x-2">
+                          <Users className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
                           <span>{survey.response_count}回答</span>
                         </div>
                       </div>
                       
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Star className="w-4 h-4 text-yellow-500" />
-                          <span className="text-sm font-medium text-green-600">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center space-x-1 sm:space-x-2">
+                          <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
+                          <span className="text-xs sm:text-sm font-medium text-green-600">
                             +{survey.respondent_points}pt
                           </span>
                         </div>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs px-2 py-1">
                           {formatDate(survey.created_at)}
                         </Badge>
                       </div>
 
-                      <Link href={`/survey/${survey.id}`}>
-                        <Button className="w-full" variant="outline">
-                          回答する
+                      {survey.has_answered ? (
+                        <Button className="w-full h-9 sm:h-10" variant="secondary" disabled>
+                          <Trophy className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                          <span className="text-xs sm:text-sm">回答済み</span>
                         </Button>
-                      </Link>
+                      ) : (
+                        <Link href={`/survey/${survey.id}`}>
+                          <Button className="w-full h-9 sm:h-10" variant="outline">
+                            <span className="text-xs sm:text-sm">回答する</span>
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

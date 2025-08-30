@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowLeft, Mail, Lock, User } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ArrowLeft, Mail, Lock, User, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth"
+import { FirebaseError } from "firebase/app"
 
 export default function SignupPage() {
   const { signUp } = useAuth()
@@ -22,17 +24,44 @@ export default function SignupPage() {
   })
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const getErrorMessage = (error: any): string => {
+    if (error instanceof FirebaseError) {
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          return 'このメールアドレスは既に登録されています。ログインしてみてください。'
+        case 'auth/weak-password':
+          return 'パスワードが弱すぎます。6文字以上の強いパスワードを使用してください。'
+        case 'auth/invalid-email':
+          return '無効なメールアドレス形式です。'
+        case 'auth/network-request-failed':
+          return 'ネットワークエラーが発生しました。インターネット接続を確認してください。'
+        case 'auth/too-many-requests':
+          return 'リクエストが多すぎます。しばらく時間をおいてからお試しください。'
+        default:
+          return `登録エラー: ${error.message}`
+      }
+    }
+    return '登録に失敗しました。もう一度お試しください。'
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
 
     if (formData.password !== formData.confirmPassword) {
-      alert("パスワードが一致しません")
+      setError("パスワードが一致しません")
       return
     }
 
     if (!agreedToTerms) {
-      alert("利用規約に同意してください")
+      setError("利用規約とプライバシーポリシーに同意してください")
+      return
+    }
+
+    if (formData.password.length < 6) {
+      setError("パスワードは6文字以上で入力してください")
       return
     }
 
@@ -48,12 +77,16 @@ export default function SignupPage() {
     } catch (error) {
       console.error('Registration error:', error)
       setIsLoading(false)
-      alert('登録に失敗しました。もう一度お試しください。')
+      setError(getErrorMessage(error))
     }
   }
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    // Clear error when user starts typing
+    if (error) {
+      setError(null)
+    }
   }
 
   return (
@@ -81,6 +114,12 @@ export default function SignupPage() {
             <CardDescription>アカウントを作成してSurQを始めましょう</CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">お名前</Label>
@@ -121,12 +160,12 @@ export default function SignupPage() {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="8文字以上のパスワード"
+                    placeholder="6文字以上のパスワード"
                     value={formData.password}
                     onChange={(e) => handleInputChange("password", e.target.value)}
                     className="pl-10"
                     required
-                    minLength={8}
+                    minLength={6}
                   />
                 </div>
               </div>

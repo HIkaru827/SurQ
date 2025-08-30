@@ -81,19 +81,35 @@ export async function POST(
     })
 
     // 回答者にポイントを付与
-    if (respondent_email && surveyData.respondent_points > 0) {
+    if (respondent_email) {
       const usersQuery = query(collection(db, 'users'), where('email', '==', respondent_email))
       const userSnapshot = await getDocs(usersQuery)
       
       if (!userSnapshot.empty) {
+        // 既存ユーザーのポイント更新
         const userDoc = userSnapshot.docs[0]
         const currentPoints = userDoc.data().points || 0
         
         await updateDoc(doc(db, 'users', userDoc.id), {
-          points: currentPoints + surveyData.respondent_points,
+          points: currentPoints + (surveyData.respondent_points || 0),
           surveys_answered: (userDoc.data().surveys_answered || 0) + 1,
           updated_at: serverTimestamp()
         })
+      } else {
+        // ユーザーが存在しない場合、新規作成
+        const newUserData = {
+          name: respondent_name || 'Anonymous User',
+          email: respondent_email,
+          points: surveyData.respondent_points || 0,
+          surveys_answered: 1,
+          surveys_created: 0,
+          level: 1,
+          badges: [],
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp()
+        }
+        
+        await addDoc(collection(db, 'users'), newUserData)
       }
     }
 

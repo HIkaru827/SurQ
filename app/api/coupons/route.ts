@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     
     if (!couponData) {
       return NextResponse.json({ 
-        error: "無効なクーポンコードです" 
+        error: "このクーポンは無効です" 
       }, { status: 400 })
     }
 
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       
       if (alreadyUsed) {
         return NextResponse.json({ 
-          error: "このクーポンは既に使用されています" 
+          error: "このクーポンは使用済みです" 
         }, { status: 400 })
       }
     } catch (error) {

@@ -20,6 +20,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<FirebaseUser>
   signUp: (email: string, password: string, name: string) => Promise<FirebaseUser>
   logout: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -40,6 +41,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userProfile, setUserProfile] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // プロフィールを強制的に再読み込みする関数
+  const refreshUserProfile = async (firebaseUser: FirebaseUser) => {
+    try {
+      const response = await fetch(`/api/users?email=${encodeURIComponent(firebaseUser.email!)}`)
+      if (response.ok) {
+        const data = await response.json()
+        setUserProfile(data.user)
+        // 新しいプロフィールをキャッシュに保存
+        if (data.user) {
+          sessionStorage.setItem(`profile_${firebaseUser.uid}`, JSON.stringify(data.user))
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing user profile:', error)
+    }
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -122,13 +140,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await signOut(auth)
   }
 
+  const refreshProfile = async (): Promise<void> => {
+    if (user) {
+      await refreshUserProfile(user)
+    }
+  }
+
   const value: AuthContextType = {
     user,
     userProfile,
     loading,
     signIn,
     signUp,
-    logout
+    logout,
+    refreshProfile
   }
 
   return (

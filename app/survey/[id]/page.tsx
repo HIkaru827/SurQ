@@ -218,6 +218,13 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         setIsCompleted(true)
         setTimeout(() => setShowCompletion(true), 500)
         toast.success(`アンケートを送信しました！${data.points_earned}ポイント獲得！`)
+        
+        // キャッシュをクリアしてアプリページでの表示を更新
+        sessionStorage.removeItem('cached_surveys')
+        sessionStorage.removeItem('cached_surveys_time')
+        if (user?.uid) {
+          sessionStorage.removeItem(`profile_${user.uid}`)
+        }
       } else {
         toast.error(data.error || 'アンケートの送信に失敗しました')
       }
@@ -290,17 +297,17 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       <div className="min-h-screen bg-background">
         {/* Header */}
         <header className="border-b border-border bg-background/95 backdrop-blur">
-          <div className="container mx-auto px-4 py-4">
+          <div className="container mx-auto px-4 py-3 sm:py-4">
             <div className="flex items-center justify-between">
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className="p-2">
                 <Link href="/app">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  戻る
+                  <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="text-sm">戻る</span>
                 </Link>
               </Button>
-              <div className="text-center">
-                <h1 className="font-semibold text-foreground">{survey.title}</h1>
-                <p className="text-sm text-muted-foreground">回答者情報の入力</p>
+              <div className="text-center flex-1 mx-4">
+                <h1 className="font-semibold text-foreground text-sm sm:text-base line-clamp-1">{survey.title}</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground">回答者情報の入力</p>
               </div>
               <div className="w-16" /> {/* Spacer for centering */}
             </div>
@@ -308,41 +315,43 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         </header>
 
         {/* User Form */}
-        <main className="container mx-auto px-4 py-8 max-w-2xl">
+        <main className="container mx-auto px-4 py-6 sm:py-8 max-w-2xl">
           <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-xl">回答者情報</CardTitle>
-              <p className="text-muted-foreground">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-xl">回答者情報</CardTitle>
+              <p className="text-muted-foreground text-sm sm:text-base">
                 アンケートに回答するために、お名前とメールアドレスをご入力ください。
               </p>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
               <div className="space-y-2">
-                <Label htmlFor="name">お名前 *</Label>
+                <Label htmlFor="name" className="text-sm sm:text-base">お名前 *</Label>
                 <Input
                   id="name"
                   placeholder="山田太郎"
                   value={respondentName}
                   onChange={(e) => setRespondentName(e.target.value)}
+                  className="h-10 sm:h-11 text-sm sm:text-base"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="email">メールアドレス *</Label>
+                <Label htmlFor="email" className="text-sm sm:text-base">メールアドレス *</Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="example@email.com"
                   value={respondentEmail}
                   onChange={(e) => setRespondentEmail(e.target.value)}
+                  className="h-10 sm:h-11 text-sm sm:text-base"
                 />
               </div>
 
-              <div className="pt-4">
+              <div className="pt-2 sm:pt-4">
                 <Button 
                   onClick={handleStartSurvey}
                   disabled={!respondentEmail || !respondentName}
-                  className="w-full"
+                  className="w-full h-10 sm:h-11 text-sm sm:text-base"
                 >
                   アンケートを開始する
                 </Button>
@@ -358,17 +367,17 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" asChild className="p-2">
               <Link href="/app">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                戻る
+                <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" />
+                <span className="text-sm">戻る</span>
               </Link>
             </Button>
-            <div className="text-center">
-              <h1 className="font-semibold text-foreground">{survey.title}</h1>
-              <p className="text-sm text-muted-foreground">
+            <div className="text-center flex-1 mx-4">
+              <h1 className="font-semibold text-foreground text-sm sm:text-base line-clamp-1">{survey.title}</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 {currentQuestion + 1} / {totalQuestions}
               </p>
             </div>
@@ -378,17 +387,17 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       </header>
 
       {/* Progress Bar */}
-      <div className="container mx-auto px-4 py-4">
+      <div className="container mx-auto px-4 py-3 sm:py-4">
         <Progress value={progress} className="h-2" />
       </div>
 
       {/* Question Content */}
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
+      <main className="container mx-auto px-4 py-6 sm:py-8 max-w-2xl">
         <Card className="border-0 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl text-balance">{currentQ.question}</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl text-balance leading-tight">{currentQ.question}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
             {/* Multiple Choice Questions */}
             {currentQ.type === "multiple-choice" && (
               <RadioGroup
@@ -465,36 +474,36 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         </Card>
 
         {/* Navigation */}
-        <div className="flex justify-between items-center mt-8">
+        <div className="flex justify-between items-center mt-6 sm:mt-8 gap-4">
           <Button
             variant="outline"
             onClick={handlePrevious}
             disabled={currentQuestion === 0}
-            className="flex items-center bg-transparent"
+            className="flex items-center bg-transparent h-10 sm:h-11 px-3 sm:px-4"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            前の質問
+            <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" />
+            <span className="text-sm sm:text-base">前の質問</span>
           </Button>
 
           <Button 
             onClick={handleNext} 
             disabled={!canProceed || submitting} 
-            className="flex items-center"
+            className="flex items-center h-10 sm:h-11 px-3 sm:px-4 flex-1 max-w-[200px]"
           >
             {submitting ? (
               <>
-                <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                送信中...
+                <div className="w-4 h-4 mr-1 sm:mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm sm:text-base">送信中...</span>
               </>
             ) : currentQuestion === totalQuestions - 1 ? (
               <>
-                <CheckCircle className="w-4 h-4 mr-2" />
-                送信
+                <CheckCircle className="w-4 h-4 mr-1 sm:mr-2" />
+                <span className="text-sm sm:text-base">送信</span>
               </>
             ) : (
               <>
-                次の質問
-                <ArrowRight className="w-4 h-4 ml-2" />
+                <span className="text-sm sm:text-base">次の質問</span>
+                <ArrowRight className="w-4 h-4 ml-1 sm:ml-2" />
               </>
             )}
           </Button>

@@ -222,7 +222,7 @@ const levelInfo = {
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, userProfile, loading: authLoading } = useAuth()
+  const { user, userProfile, loading: authLoading, refreshProfile } = useAuth()
   const [activeTab, setActiveTab] = useState('surveys')
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null)
   const [userSurveys, setUserSurveys] = useState<Survey[]>([])
@@ -292,13 +292,21 @@ export default function ProfilePage() {
           })
         }
         
+        // AuthContextのキャッシュもクリア
+        if (user?.uid) {
+          sessionStorage.removeItem(`profile_${user.uid}`)
+        }
+        
         await fetchCouponHistory()
-        // AuthContextのuserProfileも更新されるように再読み込み
-        setTimeout(() => {
-          window.location.reload()
-        }, 1000)
+        
+        // AuthContextのプロフィールを更新
+        await refreshProfile()
+        
+        // ローカルプロフィールも再取得
+        await refreshUserProfile()
+        
       } else {
-        toast.error(data.error || '無効なクーポンコードです')
+        toast.error(data.error || 'クーポンの適用に失敗しました')
       }
     } catch (error) {
       console.error('Error applying coupon:', error)
@@ -436,6 +444,29 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error fetching answered surveys:', error)
       setAnsweredSurveys([])
+    }
+  }
+
+  const refreshUserProfile = async () => {
+    if (!user?.email) return
+    
+    try {
+      // APIから最新のユーザーデータを取得
+      const response = await fetch(`/api/users?email=${encodeURIComponent(user.email)}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.user) {
+          // ローカルプロフィールを更新
+          setLocalProfile(prevProfile => ({
+            ...prevProfile!,
+            points: data.user.points || 0,
+            surveys_answered: data.user.surveys_answered || 0,
+            level: Math.floor((data.user.points || 0) / 100) + 1
+          }))
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing user profile:', error)
     }
   }
 
@@ -821,13 +852,13 @@ export default function ProfilePage() {
           {/* Main Content */}
           <div className="lg:col-span-2">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="surveys">作成</TabsTrigger>
-                <TabsTrigger value="answered">回答済み</TabsTrigger>
-                <TabsTrigger value="analytics">分析</TabsTrigger>
-                <TabsTrigger value="achievements">実績</TabsTrigger>
-                <TabsTrigger value="activity">活動</TabsTrigger>
-                <TabsTrigger value="stats">統計</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-0 h-auto sm:h-10 p-1">
+                <TabsTrigger value="surveys" className="text-xs sm:text-sm py-2 px-2 sm:px-3">作成</TabsTrigger>
+                <TabsTrigger value="answered" className="text-xs sm:text-sm py-2 px-2 sm:px-3">回答済み</TabsTrigger>
+                <TabsTrigger value="analytics" className="text-xs sm:text-sm py-2 px-2 sm:px-3">分析</TabsTrigger>
+                <TabsTrigger value="achievements" className="text-xs sm:text-sm py-2 px-2 sm:px-3">実績</TabsTrigger>
+                <TabsTrigger value="activity" className="text-xs sm:text-sm py-2 px-2 sm:px-3">活動</TabsTrigger>
+                <TabsTrigger value="stats" className="text-xs sm:text-sm py-2 px-2 sm:px-3">統計</TabsTrigger>
               </TabsList>
 
               {/* Surveys Tab */}
