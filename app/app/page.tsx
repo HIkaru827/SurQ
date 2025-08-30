@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useAuth } from '@/lib/auth'
+import { isDeveloperAccount } from '@/lib/developer'
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -26,10 +28,19 @@ export default function AppPage() {
   const [userSurveys, setUserSurveys] = useState<Survey[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const { user, userProfile } = useAuth()
+  
+  const isDevAccount = user?.email ? isDeveloperAccount(user.email) : false
+
 
   useEffect(() => {
-    fetchSurveys()
-    loadCurrentUser()
+    // 並列実行で高速化
+    Promise.all([
+      fetchSurveys(),
+      loadCurrentUser()
+    ]).finally(() => {
+      setLoading(false)
+    })
   }, [])
 
   useEffect(() => {
@@ -51,15 +62,29 @@ export default function AppPage() {
 
   const fetchSurveys = async () => {
     try {
+      // キャッシュチェック
+      const cachedSurveys = sessionStorage.getItem('cached_surveys')
+      const cachedTime = sessionStorage.getItem('cached_surveys_time')
+      
+      if (cachedSurveys && cachedTime) {
+        const cacheAge = Date.now() - parseInt(cachedTime)
+        if (cacheAge < 30000) { // 30秒以内なら使用
+          setSurveys(JSON.parse(cachedSurveys))
+          return
+        }
+      }
+
       const response = await fetch('/api/surveys')
       if (response.ok) {
         const data = await response.json()
         setSurveys(data.surveys || [])
+        
+        // キャッシュに保存
+        sessionStorage.setItem('cached_surveys', JSON.stringify(data.surveys || []))
+        sessionStorage.setItem('cached_surveys_time', Date.now().toString())
       }
     } catch (error) {
       console.error('Error fetching surveys:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -97,17 +122,24 @@ export default function AppPage() {
               </div>
               <span className="text-xl font-bold text-foreground">SurQ</span>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              {userProfile && (
+                <div className="hidden sm:flex items-center space-x-2">
+                  <Badge variant="secondary" className={`font-medium ${isDevAccount ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-primary/10 text-primary border-primary/20'}`}>
+                    {isDevAccount ? '∞pt' : `${userProfile.points?.toLocaleString() || '0'}pt`}
+                  </Badge>
+                </div>
+              )}
               <Link href="/profile">
-                <Button variant="ghost" size="default">
-                  <User className="w-5 h-5 mr-2" />
-                  {currentUser ? `${currentUser.name}さん` : 'マイページ'}
+                <Button variant="ghost" size="sm" className="sm:size-default">
+                  <User className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                  <span className="hidden sm:inline">{currentUser ? `${currentUser.name}さん` : 'マイページ'}</span>
                 </Button>
               </Link>
               <Button
                 variant="default"
-                size="default"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                size="sm"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground sm:size-default"
                 onClick={() => {
                   const surveysSection = document.getElementById('surveys')
                   if (surveysSection) {
@@ -115,17 +147,17 @@ export default function AppPage() {
                   }
                 }}
               >
-                <MessageSquare className="w-5 h-5 mr-2" />
-                回答する
+                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                <span className="text-sm sm:text-base">回答</span>
               </Button>
               <Link href="/survey/create">
                 <Button
                   variant="outline"
-                  size="default"
-                  className="border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent"
+                  size="sm"
+                  className="border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground bg-transparent sm:size-default"
                 >
-                  <PlusCircle className="w-5 h-5 mr-2" />
-                  作成する
+                  <PlusCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                  <span className="text-sm sm:text-base">作成</span>
                 </Button>
               </Link>
             </div>

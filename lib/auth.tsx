@@ -58,25 +58,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (firebaseUser) {
         try {
-          // Get or create user profile in Firestore
-          let profile = await firestoreService.users.getById(firebaseUser.uid)
-          
-          if (!profile) {
-            // Create profile if doesn't exist
-            await firestoreService.users.create({
-              email: firebaseUser.email!,
-              name: firebaseUser.displayName || 'Anonymous User',
-              avatar_url: firebaseUser.photoURL,
-              points: 0,
-              level: 1,
-              badges: []
-            })
-            profile = await firestoreService.users.getById(firebaseUser.uid)
+          // キャッシュされたプロフィールをチェック
+          const cachedProfile = sessionStorage.getItem(`profile_${firebaseUser.uid}`)
+          if (cachedProfile) {
+            setUserProfile(JSON.parse(cachedProfile))
+            setLoading(false)
+            return
           }
-          
-          setUserProfile(profile)
+
+          // emailベースでユーザーを取得（APIと同じ方法）
+          const response = await fetch(`/api/users?email=${encodeURIComponent(firebaseUser.email!)}`)
+          if (response.ok) {
+            const data = await response.json()
+            setUserProfile(data.user)
+            // プロフィールをキャッシュ（5分間）
+            sessionStorage.setItem(`profile_${firebaseUser.uid}`, JSON.stringify(data.user))
+          } else {
+            setUserProfile(null)
+          }
         } catch (error) {
           console.error('Error handling user profile:', error)
+          setUserProfile(null)
         }
       } else {
         setUserProfile(null)

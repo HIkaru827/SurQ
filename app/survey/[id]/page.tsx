@@ -8,9 +8,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { ArrowLeft, ArrowRight, Trophy, Star, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth"
+import { toast } from "sonner"
 
 // Mock survey data
 const mockSurvey = {
@@ -52,6 +55,7 @@ const mockSurvey = {
 }
 
 export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
+  const { user } = useAuth()
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [isCompleted, setIsCompleted] = useState(false)
@@ -60,6 +64,11 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [surveyId, setSurveyId] = useState<string>('')
+  const [submitting, setSubmitting] = useState(false)
+  const [hasAlreadyAnswered, setHasAlreadyAnswered] = useState(false)
+  const [respondentName, setRespondentName] = useState('')
+  const [respondentEmail, setRespondentEmail] = useState('')
+  const [showUserForm, setShowUserForm] = useState(false)
 
   useEffect(() => {
     const getParams = async () => {
@@ -70,12 +79,27 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     getParams()
   }, [params])
 
+  useEffect(() => {
+    if (user?.email) {
+      setRespondentEmail(user.email)
+      setRespondentName(user.displayName || 'Anonymous')
+      setShowUserForm(false)
+    } else {
+      setShowUserForm(true)
+    }
+  }, [user])
+
   const fetchSurvey = async (id: string) => {
     try {
       const response = await fetch(`/api/surveys/${id}`)
       if (response.ok) {
         const data = await response.json()
         setSurvey(data.survey)
+        
+        // Check if user has already answered this survey
+        if (user?.email) {
+          checkIfAlreadyAnswered(id, user.email)
+        }
       } else if (response.status === 404) {
         setError('アンケートが見つかりません')
       } else {
@@ -86,6 +110,18 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       setError('アンケートの読み込みに失敗しました')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const checkIfAlreadyAnswered = async (surveyId: string, email: string) => {
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/responses?email=${encodeURIComponent(email)}`)
+      if (response.ok) {
+        const data = await response.json()
+        setHasAlreadyAnswered(data.hasResponded)
+      }
+    } catch (error) {
+      console.error('Error checking response status:', error)
     }
   }
 
@@ -116,6 +152,31 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     )
   }
 
+  // Show message if user has already answered
+  if (hasAlreadyAnswered) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md text-center">
+          <CardContent className="p-6">
+            <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
+            <h2 className="text-xl font-semibold mb-4">既に回答済みです</h2>
+            <p className="text-muted-foreground mb-6">
+              このアンケートには既に回答していただいております。ご協力ありがとうございました。
+            </p>
+            <div className="space-y-3">
+              <Link href="/app">
+                <Button className="w-full">アプリに戻る</Button>
+              </Link>
+              <Link href="/profile?tab=answered">
+                <Button variant="outline" className="w-full">回答履歴を見る</Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   const totalQuestions = survey.questions.length
   const progress = ((currentQuestion + 1) / totalQuestions) * 100
 
@@ -123,13 +184,57 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     setAnswers((prev) => ({ ...prev, [questionId]: answer }))
   }
 
+  const handleStartSurvey = () => {
+    if (!respondentEmail || !respondentName) {
+      toast.error('名前とメールアドレスを入力してください')
+      return
+    }
+    setShowUserForm(false)
+  }
+
+  const submitSurvey = async () => {
+    if (!respondentEmail || !respondentName) {
+      toast.error('回答者情報が不足しています')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/responses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          responses: answers,
+          respondent_email: respondentEmail,
+          respondent_name: respondentName,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setIsCompleted(true)
+        setTimeout(() => setShowCompletion(true), 500)
+        toast.success(`アンケートを送信しました！${data.points_earned}ポイント獲得！`)
+      } else {
+        toast.error(data.error || 'アンケートの送信に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error submitting survey:', error)
+      toast.error('アンケートの送信に失敗しました')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleNext = () => {
     if (currentQuestion < totalQuestions - 1) {
       setCurrentQuestion((prev) => prev + 1)
     } else {
       // Complete survey
-      setIsCompleted(true)
-      setTimeout(() => setShowCompletion(true), 500)
+      submitSurvey()
     }
   }
 
@@ -175,6 +280,76 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
             </div>
           </CardContent>
         </Card>
+      </div>
+    )
+  }
+
+  // Show user information form for anonymous users
+  if (showUserForm) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <header className="border-b border-border bg-background/95 backdrop-blur">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/app">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  戻る
+                </Link>
+              </Button>
+              <div className="text-center">
+                <h1 className="font-semibold text-foreground">{survey.title}</h1>
+                <p className="text-sm text-muted-foreground">回答者情報の入力</p>
+              </div>
+              <div className="w-16" /> {/* Spacer for centering */}
+            </div>
+          </div>
+        </header>
+
+        {/* User Form */}
+        <main className="container mx-auto px-4 py-8 max-w-2xl">
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-xl">回答者情報</CardTitle>
+              <p className="text-muted-foreground">
+                アンケートに回答するために、お名前とメールアドレスをご入力ください。
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="name">お名前 *</Label>
+                <Input
+                  id="name"
+                  placeholder="山田太郎"
+                  value={respondentName}
+                  onChange={(e) => setRespondentName(e.target.value)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="email">メールアドレス *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="example@email.com"
+                  value={respondentEmail}
+                  onChange={(e) => setRespondentEmail(e.target.value)}
+                />
+              </div>
+
+              <div className="pt-4">
+                <Button 
+                  onClick={handleStartSurvey}
+                  disabled={!respondentEmail || !respondentName}
+                  className="w-full"
+                >
+                  アンケートを開始する
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
       </div>
     )
   }
@@ -301,11 +476,20 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
             前の質問
           </Button>
 
-          <Button onClick={handleNext} disabled={!canProceed} className="flex items-center">
-            {currentQuestion === totalQuestions - 1 ? (
+          <Button 
+            onClick={handleNext} 
+            disabled={!canProceed || submitting} 
+            className="flex items-center"
+          >
+            {submitting ? (
+              <>
+                <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                送信中...
+              </>
+            ) : currentQuestion === totalQuestions - 1 ? (
               <>
                 <CheckCircle className="w-4 h-4 mr-2" />
-                完了
+                送信
               </>
             ) : (
               <>

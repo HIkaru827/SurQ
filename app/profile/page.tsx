@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
+import { isDeveloperAccount } from '@/lib/developer'
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
@@ -39,7 +42,9 @@ import {
   Share2,
   RefreshCw,
   MoreHorizontal,
-  Trash2
+  Trash2,
+  Gift,
+  Ticket
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import {
@@ -82,6 +87,15 @@ interface UserProfile {
   surveys_answered: number
   total_responses_received: number
   joined_at: string
+}
+
+interface AnsweredSurvey {
+  id: string
+  survey_id: string
+  survey_title: string
+  points_earned: number
+  submitted_at: string
+  responses: any
 }
 
 const badges = [
@@ -209,9 +223,90 @@ const levelInfo = {
 export default function ProfilePage() {
   const router = useRouter()
   const { user, userProfile, loading: authLoading } = useAuth()
+  const [activeTab, setActiveTab] = useState('surveys')
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null)
   const [userSurveys, setUserSurveys] = useState<Survey[]>([])
+  const [answeredSurveys, setAnsweredSurveys] = useState<AnsweredSurvey[]>([])
   const [loading, setLoading] = useState(true)
+  const [couponCode, setCouponCode] = useState('')
+  const [couponHistory, setCouponHistory] = useState<any[]>([])
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [showCouponDialog, setShowCouponDialog] = useState(false)
+  
+  const isDevAccount = user?.email ? isDeveloperAccount(user.email) : false
+
+  const fetchCouponHistory = async () => {
+    if (!user?.email) return
+    
+    try {
+      const response = await fetch(`/api/coupons?email=${encodeURIComponent(user.email)}`)
+      if (response.ok) {
+        const data = await response.json()
+        setCouponHistory(data.history || [])
+      } else {
+        console.error('Failed to fetch coupon history')
+        setCouponHistory([])
+      }
+    } catch (error) {
+      console.error('Error fetching coupon history:', error)
+      setCouponHistory([])
+    }
+  }
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error('クーポンコードを入力してください')
+      return
+    }
+
+    if (!user?.email) {
+      toast.error('ユーザー情報が見つかりません')
+      return
+    }
+
+    setCouponLoading(true)
+    try {
+      const response = await fetch('/api/coupons', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: user.email,
+          couponCode: couponCode.trim()
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        // 成功時の処理
+        toast.success(`${data.pointsAdded}ポイントが追加されました！`)
+        setCouponCode('')
+        
+        // ローカルプロフィールのポイントを即座に更新
+        if (localProfile) {
+          setLocalProfile({
+            ...localProfile,
+            points: data.newTotal
+          })
+        }
+        
+        await fetchCouponHistory()
+        // AuthContextのuserProfileも更新されるように再読み込み
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
+      } else {
+        toast.error(data.error || '無効なクーポンコードです')
+      }
+    } catch (error) {
+      console.error('Error applying coupon:', error)
+      toast.error('クーポンの適用に失敗しました')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!authLoading) {
@@ -220,87 +315,84 @@ export default function ProfilePage() {
         router.push('/login')
         return
       }
-      fetchUserData()
-      fetchUserSurveys()
+      // 並列実行で高速化
+      Promise.all([
+        fetchUserData(),
+        fetchUserSurveys(),
+        fetchAnsweredSurveys()
+      ]).finally(() => {
+        setLoading(false)
+      })
     }
   }, [user, authLoading, router])
 
+  useEffect(() => {
+    // Handle URL query parameter for tab
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const tab = params.get('tab')
+      if (tab && ['surveys', 'answered', 'analytics', 'achievements', 'activity', 'stats'].includes(tab)) {
+        setActiveTab(tab)
+      }
+    }
+  }, [])
+
   const fetchUserData = async () => {
     try {
-      // Firebase認証からユーザー情報を取得
-      if (!user?.email) {
-        throw new Error('No user logged in')
-      }
-
-      // Auth contextからユーザーデータを使用
-      if (userProfile) {
-        setLocalProfile(userProfile)
-        setLoading(false)
+      // Auth contextからユーザーデータを使用（優先）
+      if (userProfile && user) {
+        const userData: UserProfile = {
+          id: user.uid,
+          name: user.displayName || userProfile.name || 'ユーザー',
+          email: user.email || userProfile.email,
+          avatar_url: user.photoURL || userProfile.avatar_url,
+          points: userProfile.points || 0,
+          level: userProfile.level || 1,
+          badges: userProfile.badges || [],
+          surveys_created: userProfile.surveys_created || 0,
+          surveys_answered: userProfile.surveys_answered || 0,
+          total_responses_received: userProfile.total_responses_received || 0,
+          joined_at: userProfile.created_at || new Date().toISOString()
+        }
+        setLocalProfile(userData)
         return
       }
 
-      // APIからユーザーデータを取得（必要に応じて）
-      const userResponse = await fetch(`/api/users?email=${encodeURIComponent(user.email)}`)
-      let firestoreUser = null
-      
-      if (userResponse.ok) {
-        const userData = await userResponse.json()
-        firestoreUser = userData.user
+      // フォールバック: Firebase認証情報のみ使用
+      if (user) {
+        const userData: UserProfile = {
+          id: user.uid,
+          name: user.displayName || 'ユーザー',
+          email: user.email || 'user@example.com',
+          avatar_url: user.photoURL,
+          points: 0,
+          level: 1,
+          badges: [],
+          surveys_created: 0,
+          surveys_answered: 0,
+          total_responses_received: 0,
+          joined_at: new Date().toISOString()
+        }
+        setLocalProfile(userData)
       }
-
-      // 実際のアンケート数を取得してユーザーデータに反映
-      const surveyResponse = await fetch('/api/surveys')
-      let surveysCreated = 0
-      let totalPoints = 0
-      let totalResponses = 0
-      
-      if (surveyResponse.ok) {
-        const data = await surveyResponse.json()
-        // 現在のユーザーが作成したアンケートのみフィルタリング
-        const userId = user.uid || firestoreUser?.id || 'anonymous-user'
-        const userSurveys = data.surveys.filter((survey: any) => 
-          survey.creator_id === userId || survey.creator_id === 'anonymous-user'
-        )
-        
-        surveysCreated = userSurveys.length
-        totalPoints = userSurveys.reduce((sum: number, survey: any) => sum + survey.creator_points, 0)
-        totalResponses = userSurveys.reduce((sum: number, survey: any) => sum + survey.response_count, 0)
-      }
-
-      const userData: UserProfile = {
-        id: user.uid || firestoreUser?.id || 'current-user',
-        name: user.displayName || firestoreUser?.name || 'ユーザー',
-        email: user.email || firestoreUser?.email || 'user@example.com',
-        avatar_url: user.photoURL || firestoreUser?.avatar_url || undefined,
-        points: totalPoints,
-        level: Math.floor(totalPoints / 100) + 1,
-        badges: surveysCreated > 0 ? ['初回作成'] : [],
-        surveys_created: surveysCreated,
-        surveys_answered: firestoreUser?.surveys_answered || 0,
-        total_responses_received: totalResponses,
-        joined_at: firestoreUser?.created_at || new Date().toISOString()
-      }
-
-      setLocalProfile(userData)
     } catch (error) {
       console.error('Error fetching user data:', error)
-      // フォールバック用の基本データ
-      const userData: UserProfile = {
-        id: user?.uid || 'current-user',
-        name: user?.displayName || 'ユーザー',
-        email: user?.email || 'user@example.com',
-        avatar_url: user?.photoURL || undefined,
-        points: 0,
-        level: 1,
-        badges: [],
-        surveys_created: 0,
-        surveys_answered: 0,
-        total_responses_received: 0,
-        joined_at: new Date().toISOString()
+      if (user) {
+        const userData: UserProfile = {
+          id: user.uid,
+          name: user.displayName || 'ユーザー',
+          email: user.email || 'user@example.com',
+          avatar_url: user.photoURL,
+          points: 0,
+          level: 1,
+          badges: [],
+          surveys_created: 0,
+          surveys_answered: 0,
+          total_responses_received: 0,
+          joined_at: new Date().toISOString()
+        }
+        setLocalProfile(userData)
       }
-      setLocalProfile(userData)
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -323,6 +415,27 @@ export default function ProfilePage() {
       setUserSurveys([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchAnsweredSurveys = async () => {
+    if (!user?.email) {
+      setAnsweredSurveys([])
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(user.email)}/answered-surveys`)
+      if (response.ok) {
+        const data = await response.json()
+        setAnsweredSurveys(data.surveys || [])
+      } else {
+        console.error('Failed to fetch answered surveys')
+        setAnsweredSurveys([])
+      }
+    } catch (error) {
+      console.error('Error fetching answered surveys:', error)
+      setAnsweredSurveys([])
     }
   }
 
@@ -350,7 +463,7 @@ export default function ProfilePage() {
         
         toast.success(message)
         
-        // プロフィール情報を再読み込み
+        // マイページ情報を再読み込み
         await fetchUserData()
       } else {
         throw new Error('削除に失敗しました')
@@ -432,13 +545,13 @@ export default function ProfilePage() {
     )
   }
 
-  // プロフィールデータがまだ取得されていない場合
+  // マイページデータがまだ取得されていない場合
   if (!localProfile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <div className="text-muted-foreground">プロフィールを読み込み中...</div>
+          <div className="text-muted-foreground">マイページを読み込み中...</div>
         </div>
       </div>
     )
@@ -457,9 +570,9 @@ export default function ProfilePage() {
               </Link>
             </Button>
             <div className="flex items-center space-x-4">
-              <h1 className="font-semibold text-foreground">プロフィール</h1>
-              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                {localProfile.points.toLocaleString()}pt
+              <h1 className="font-semibold text-foreground">マイページ</h1>
+              <Badge variant="secondary" className={`${isDevAccount ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-primary/10 text-primary border-primary/20'}`}>
+                {isDevAccount ? '∞pt (開発者)' : `${localProfile.points.toLocaleString()}pt`}
               </Badge>
             </div>
             <Dialog>
@@ -476,7 +589,7 @@ export default function ProfilePage() {
                   <div className="space-y-2">
                     <Button variant="outline" className="w-full justify-start">
                       <Edit className="w-4 h-4 mr-2" />
-                      プロフィール編集
+                      マイページ編集
                     </Button>
                     <Button variant="outline" className="w-full justify-start">
                       <Settings className="w-4 h-4 mr-2" />
@@ -485,6 +598,17 @@ export default function ProfilePage() {
                     <Button variant="outline" className="w-full justify-start">
                       <Eye className="w-4 h-4 mr-2" />
                       プライバシー設定
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setShowCouponDialog(true)
+                        fetchCouponHistory()
+                      }}
+                    >
+                      <Gift className="w-4 h-4 mr-2" />
+                      クーポン
                     </Button>
                   </div>
                   <hr className="my-4" />
@@ -496,6 +620,105 @@ export default function ProfilePage() {
                     <LogOut className="w-4 h-4 mr-2" />
                     ログアウト
                   </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Coupon Dialog */}
+            <Dialog open={showCouponDialog} onOpenChange={setShowCouponDialog}>
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Gift className="w-5 h-5 text-primary" />
+                    クーポン
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-6">
+                  {/* Coupon Input Section */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">クーポンコードを入力</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex space-x-2">
+                        <div className="flex-1">
+                          <Label htmlFor="coupon-code">クーポンコード</Label>
+                          <Input
+                            id="coupon-code"
+                            placeholder="クーポンコードを入力してください"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                applyCoupon()
+                              }
+                            }}
+                          />
+                        </div>
+                        <Button 
+                          onClick={applyCoupon}
+                          disabled={couponLoading || !couponCode.trim()}
+                          className="mt-6"
+                        >
+                          {couponLoading ? '適用中...' : '適用'}
+                        </Button>
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground">
+                        <p>有効なクーポンコード例:</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <Badge variant="outline" className="cursor-pointer" onClick={() => setCouponCode('NEW2025')}>
+                            NEW2025 (200pt)
+                          </Badge>
+                          <Badge variant="outline" className="cursor-pointer" onClick={() => setCouponCode('BONUS100')}>
+                            BONUS100 (100pt)
+                          </Badge>
+                          <Badge variant="outline" className="cursor-pointer" onClick={() => setCouponCode('FIRST50')}>
+                            FIRST50 (50pt)
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Coupon History Section */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">クーポン使用履歴</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {couponHistory.length > 0 ? (
+                        <div className="space-y-3">
+                          {couponHistory.map((coupon) => (
+                            <div key={coupon.id} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                                  <Ticket className="w-5 h-5 text-primary" />
+                                </div>
+                                <div>
+                                  <div className="font-medium">{coupon.code}</div>
+                                  <div className="text-sm text-muted-foreground">{coupon.description}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {new Date(coupon.usedAt).toLocaleDateString('ja-JP')}
+                                  </div>
+                                </div>
+                              </div>
+                              <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">
+                                +{coupon.points}pt
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Ticket className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                          <p>まだクーポンを使用していません</p>
+                          <p className="text-sm">上記からクーポンコードを入力して、ポイントを獲得しましょう！</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               </DialogContent>
             </Dialog>
@@ -527,8 +750,12 @@ export default function ProfilePage() {
                         <Star className="w-4 h-4 text-primary" />
                         <span className="text-sm font-medium text-muted-foreground">保有ポイント</span>
                       </div>
-                      <div className="text-3xl font-bold text-primary">{localProfile.points.toLocaleString()}</div>
-                      <div className="text-sm text-muted-foreground mt-1">ポイント</div>
+                      <div className={`text-3xl font-bold ${isDevAccount ? 'text-purple-600' : 'text-primary'}`}>
+                        {isDevAccount ? '∞' : localProfile.points.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {isDevAccount ? '開発者ポイント' : 'ポイント'}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
@@ -593,13 +820,14 @@ export default function ProfilePage() {
 
           {/* Main Content */}
           <div className="lg:col-span-2">
-            <Tabs defaultValue="surveys" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="surveys">アンケート</TabsTrigger>
-                <TabsTrigger value="analytics">アナリティクス</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+              <TabsList className="grid w-full grid-cols-6">
+                <TabsTrigger value="surveys">作成</TabsTrigger>
+                <TabsTrigger value="answered">回答済み</TabsTrigger>
+                <TabsTrigger value="analytics">分析</TabsTrigger>
                 <TabsTrigger value="achievements">実績</TabsTrigger>
-                <TabsTrigger value="activity">アクティビティ</TabsTrigger>
-                <TabsTrigger value="stats">詳細統計</TabsTrigger>
+                <TabsTrigger value="activity">活動</TabsTrigger>
+                <TabsTrigger value="stats">統計</TabsTrigger>
               </TabsList>
 
               {/* Surveys Tab */}
@@ -724,6 +952,72 @@ export default function ProfilePage() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Answered Surveys Tab */}
+              <TabsContent value="answered" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <MessageSquare className="w-5 h-5 text-primary" />
+                      <span>回答済みアンケート</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {answeredSurveys.length === 0 ? (
+                      <div className="text-center py-8">
+                        <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">まだアンケートに回答していません</h3>
+                        <p className="text-muted-foreground mb-4">
+                          アンケートに回答してポイントを獲得しましょう！
+                        </p>
+                        <Link href="/app#surveys">
+                          <Button>
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            アンケートを探す
+                          </Button>
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {answeredSurveys.map((survey) => (
+                          <div key={survey.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <h3 className="font-semibold text-foreground">{survey.survey_title}</h3>
+                                  <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">
+                                    +{survey.points_earned}pt
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                                  <span>回答日: {formatDate(survey.submitted_at)}</span>
+                                  <span>獲得ポイント: {survey.points_earned}pt</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Link href={`/survey/${survey.survey_id}`}>
+                                  <Button variant="outline" size="sm">
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    詳細を見る
+                                  </Button>
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {answeredSurveys.length > 0 && (
+                          <div className="text-center pt-4 border-t">
+                            <p className="text-sm text-muted-foreground">
+                              総獲得ポイント: {answeredSurveys.reduce((sum, survey) => sum + survey.points_earned, 0)}pt
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>

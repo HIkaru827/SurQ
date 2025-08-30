@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { calculateSurveyPoints } from "@/lib/points"
+import { isDeveloperAccount } from "@/lib/developer"
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp } from "firebase/firestore"
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp, updateDoc, doc } from "firebase/firestore"
 
 // Firebase client config for server-side usage
 const firebaseConfig = {
@@ -63,7 +64,14 @@ export async function GET(request: NextRequest) {
         return dateB - dateA
       })
     
-    return NextResponse.json({ surveys })
+    const response = NextResponse.json({ surveys })
+    
+    // 公開アンケートは30秒キャッシュ
+    if (!creatorId && !includeUnpublished) {
+      response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')
+    }
+    
+    return response
   } catch (error) {
     console.error('Error fetching surveys:', error)
     return NextResponse.json({ 
@@ -91,6 +99,35 @@ export async function POST(request: NextRequest) {
       response_count: 0,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
+    }
+
+    // 公開時はユーザーのポイントをチェック・消費（開発者アカウントはスキップ）
+    if (body.is_published && body.creator_id !== 'anonymous-user' && body.creator_email) {
+      const isDevAccount = isDeveloperAccount(body.creator_email)
+      
+      if (!isDevAccount) {
+        const usersQuery = query(collection(db, 'users'), where('email', '==', body.creator_email))
+        const userSnapshot = await getDocs(usersQuery)
+        
+        if (!userSnapshot.empty) {
+          const userDoc = userSnapshot.docs[0]
+          const currentPoints = userDoc.data().points || 0
+          
+          if (currentPoints < points.creatorPoints) {
+            return NextResponse.json({ 
+              error: "Insufficient points",
+              required: points.creatorPoints,
+              current: currentPoints
+            }, { status: 400 })
+          }
+          
+          // ポイント消費
+          await updateDoc(doc(db, 'users', userDoc.id), {
+            points: currentPoints - points.creatorPoints,
+            updated_at: serverTimestamp()
+          })
+        }
+      }
     }
 
     // Firestoreに保存

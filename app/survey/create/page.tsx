@@ -5,6 +5,7 @@ import type React from "react"
 import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth"
+import { isDeveloperAccount } from "@/lib/developer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -110,7 +111,7 @@ const questionTemplates = [
 ]
 
 function CreateSurveyPageInner() {
-  const { user } = useAuth()
+  const { user, userProfile } = useAuth()
   const searchParams = useSearchParams()
   const editSurveyId = searchParams.get('edit')
   
@@ -127,6 +128,10 @@ function CreateSurveyPageInner() {
   const [originalSurvey, setOriginalSurvey] = useState<any>(null)
 
   const pointCalculation = calculateSurveyPoints(survey.questions)
+  const userPoints = userProfile?.points || 0
+  const isDevAccount = user?.email ? isDeveloperAccount(user.email) : false
+  const hasEnoughPoints = isDevAccount || userPoints >= pointCalculation.creatorPoints
+  
   
   // 編集モード時のデータ読み込み
   useEffect(() => {
@@ -176,6 +181,12 @@ function CreateSurveyPageInner() {
       return
     }
 
+    // ポイント不足チェック（開発者アカウントはスキップ）
+    if (!hasEnoughPoints && !isDevAccount) {
+      alert(`アンケートの公開には${pointCalculation.creatorPoints}ポイントが必要です。現在の保有ポイント: ${userPoints}`)
+      return
+    }
+
     // 質問のバリデーション
     for (let i = 0; i < survey.questions.length; i++) {
       const question = survey.questions[i]
@@ -207,6 +218,7 @@ function CreateSurveyPageInner() {
         body: JSON.stringify({
           ...survey,
           creator_id: creatorId,
+          creator_email: user?.email,
           is_published: true
         })
       })
@@ -216,6 +228,7 @@ function CreateSurveyPageInner() {
       }
 
       const result = await response.json()
+      
       alert('アンケートが公開されました！')
       
       // アプリページにリダイレクト
@@ -252,6 +265,7 @@ function CreateSurveyPageInner() {
         body: JSON.stringify({
           ...survey,
           creator_id: creatorId,
+          creator_email: user?.email,
           is_published: false
         })
       })
@@ -476,7 +490,15 @@ function CreateSurveyPageInner() {
                 戻る
               </Link>
             </Button>
-            <h1 className="font-semibold text-foreground">{editSurveyId ? 'アンケート編集' : 'アンケート作成'}</h1>
+            <div className="flex items-center space-x-3">
+              <h1 className="font-semibold text-foreground">{editSurveyId ? 'アンケート編集' : 'アンケート作成'}</h1>
+              {user && (
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-medium">
+                  <Star className="w-3 h-3 mr-1" />
+                  {userPoints.toLocaleString()}pt
+                </Badge>
+              )}
+            </div>
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="sm" onClick={() => setShowPreview(true)}>
                 <Eye className="w-4 h-4 mr-2" />
@@ -485,7 +507,8 @@ function CreateSurveyPageInner() {
               <Button 
                 size="sm" 
                 onClick={handlePublish}
-                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim()}
+                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || !hasEnoughPoints}
+                className={!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'opacity-50 cursor-not-allowed' : ''}
               >
                 {isPublishing ? (
                   <>公開中...</>
@@ -535,46 +558,9 @@ function CreateSurveyPageInner() {
 
           {/* Main Editor */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Question Templates */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">質問テンプレート</CardTitle>
-                <p className="text-sm text-muted-foreground">質問を追加するには、下のボタンをクリックしてください</p>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {questionTemplates.map((template) => {
-                    const Icon = template.icon
-                    const isDisabled = survey.questions.length >= MAX_QUESTIONS
-                    return (
-                      <Button
-                        key={template.type}
-                        variant="outline"
-                        className={`w-full justify-start h-auto p-4 bg-transparent ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={() => addQuestion(template.type)}
-                        disabled={isDisabled}
-                      >
-                        <div className="flex items-start space-x-3">
-                          <Icon className="w-5 h-5 text-primary mt-0.5" />
-                          <div className="text-left">
-                            <div className="font-medium">{template.label}</div>
-                            <div className="text-xs text-muted-foreground">{template.description}</div>
-                          </div>
-                        </div>
-                      </Button>
-                    )
-                  })}
-                </div>
-                {survey.questions.length >= MAX_QUESTIONS && (
-                  <div className="text-xs text-center text-amber-600 mt-4 p-2 bg-amber-50 rounded">
-                    質問数が上限に達しました
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
             {/* Point Calculation Display */}
-            <Card className="border-2 border-primary/20 bg-gradient-to-r from-blue-50/50 to-purple-50/50">
+            <Card className={`border-2 ${!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'border-red-200 bg-red-50/30' : 'border-primary/20 bg-primary/5'}`}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Star className="w-5 h-5 text-yellow-500" />
@@ -582,20 +568,51 @@ function CreateSurveyPageInner() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <div className="text-2xl font-bold text-blue-600">{survey.questions.length}</div>
-                    <div className="text-sm text-muted-foreground">質問数 (最大{MAX_QUESTIONS}問)</div>
-                  </div>
-                  <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <div className="text-2xl font-bold text-green-600">{pointCalculation.respondentPoints}pt</div>
-                    <div className="text-sm text-muted-foreground">回答者がもらえるポイント</div>
-                  </div>
-                  <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <div className="text-2xl font-bold text-red-600">{pointCalculation.creatorPoints}pt</div>
-                    <div className="text-sm text-muted-foreground">投稿に必要なポイント</div>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${isDevAccount ? 'text-purple-600' : 'text-primary'}`}>
+                        {isDevAccount ? '∞' : userPoints.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {isDevAccount ? '開発者アカウント' : '保有ポイント'}
+                      </div>
+                    </div>
+                  </Card>
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">{survey.questions.length}</div>
+                      <div className="text-sm text-muted-foreground">質問数 (最大{MAX_QUESTIONS}問)</div>
+                    </div>
+                  </Card>
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{pointCalculation.respondentPoints}pt</div>
+                      <div className="text-sm text-muted-foreground">回答者がもらえるポイント</div>
+                    </div>
+                  </Card>
+                  <Card className="p-4">
+                    <div className="text-center">
+                      <div className={`text-2xl font-bold ${!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                        {pointCalculation.creatorPoints}pt
+                      </div>
+                      <div className="text-sm text-muted-foreground">投稿に必要なポイント</div>
+                    </div>
+                  </Card>
                 </div>
+                
+                {!hasEnoughPoints && pointCalculation.creatorPoints > 0 && !isDevAccount && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                    ⚠️ ポイントが不足しています。あと{pointCalculation.creatorPoints - userPoints}ポイント必要です。
+                  </div>
+                )}
+                
+                {isDevAccount && (
+                  <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg text-purple-800 text-sm">
+                    🚀 開発者アカウント：無制限でアンケートを作成できます
+                  </div>
+                )}
+                
                 {survey.questions.length >= MAX_QUESTIONS && (
                   <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
                     ⚠️ 質問数が上限に達しました。これ以上質問を追加できません。
@@ -791,7 +808,9 @@ function CreateSurveyPageInner() {
               </Button>
               <Button 
                 onClick={handlePublish}
-                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim()}
+                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || !hasEnoughPoints}
+                className={!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'opacity-60' : ''}
+                title={!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? `ポイントが${pointCalculation.creatorPoints - userPoints}不足しています` : ''}
               >
                 {isPublishing ? (
                   <>公開中...</>

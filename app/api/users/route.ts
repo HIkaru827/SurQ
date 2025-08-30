@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, serverTimestamp } from "firebase/firestore"
+import { isDeveloperAccount, DEVELOPER_CONFIG } from "@/lib/developer"
 
 // Firebase client config for server-side usage
 const firebaseConfig = {
@@ -50,16 +51,18 @@ export async function POST(request: NextRequest) {
     }
 
     // 新しいユーザーを作成
+    const isDevAccount = isDeveloperAccount(email)
     const newUserData = {
       email,
       name,
       avatar_url: null,
-      points: 0,
-      level: 1,
+      points: isDevAccount ? DEVELOPER_CONFIG.UNLIMITED_POINTS : 0,
+      level: isDevAccount ? 999 : 1,
       badges: [],
       surveys_created: 0,
       surveys_answered: 0,
       total_responses_received: 0,
+      is_developer: isDevAccount,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp(),
       last_login: serverTimestamp()
