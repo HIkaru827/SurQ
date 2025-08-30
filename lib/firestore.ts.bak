@@ -144,7 +144,7 @@ export const getPublishedSurveys = async () => {
   const querySnapshot = await getDocs(q)
   return querySnapshot.docs.map(doc => ({
     id: doc.id,
-    ...doc.data()
+    ...(doc.data() as any)
   }))
 }
 
@@ -170,7 +170,7 @@ export const getUserSurveys = async (creatorId: string, includeUnpublished: bool
   const querySnapshot = await getDocs(q)
   return querySnapshot.docs.map(doc => ({
     id: doc.id,
-    ...doc.data()
+    ...(doc.data() as any)
   }))
 }
 
@@ -254,7 +254,7 @@ export const getSurveyResponses = async (surveyId: string) => {
   const querySnapshot = await getDocs(q)
   return querySnapshot.docs.map(doc => ({
     id: doc.id,
-    ...doc.data()
+    ...(doc.data() as any)
   }))
 }
 

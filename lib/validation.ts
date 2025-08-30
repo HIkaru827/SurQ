@@ -10,10 +10,10 @@ export const UserSchema = z.object({
 // Question validation schema
 export const QuestionSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(['multiple_choice', 'text', 'rating'], {
+  type: z.enum(['multiple-choice', 'text', 'rating', 'yes-no'], {
     errorMap: () => ({ message: '無効な質問タイプです' })
   }),
-  text: z.string().min(1, '質問文は必須です').max(500, '質問文は500文字以内で入力してください'),
+  question: z.string().min(1, '質問文は必須です').max(500, '質問文は500文字以内で入力してください'),
   options: z.array(z.string()).optional(),
   required: z.boolean().default(true)
 })
@@ -24,7 +24,8 @@ export const SurveySchema = z.object({
   description: z.string().max(1000, '説明は1000文字以内で入力してください').optional().nullable(),
   questions: z.array(QuestionSchema).min(1, '質問は少なくとも1つ必要です').max(50, '質問は50個以内で作成してください'),
   respondent_points: z.number().int().min(1, '回答者ポイントは1以上である必要があります').max(1000, '回答者ポイントは1000以下である必要があります'),
-  creator_points: z.number().int().min(0)
+  creator_points: z.number().int().min(0),
+  is_published: z.boolean().optional().default(false)
 })
 
 // Survey update schema (for partial updates)

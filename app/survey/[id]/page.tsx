@@ -405,7 +405,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
                 onValueChange={(value) => handleAnswer(currentQ.id, value)}
                 className="space-y-3"
               >
-                {currentQ.options?.map((option, index) => (
+                {currentQ.options?.map((option: string, index: number) => (
                   <div
                     key={index}
                     className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"

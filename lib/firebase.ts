@@ -75,6 +75,9 @@ export interface User {
   points: number
   level: number
   badges: any[]
+  surveys_created: number
+  surveys_answered: number
+  total_responses_received: number
   created_at: string
   updated_at: string
 }

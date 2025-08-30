@@ -24,7 +24,7 @@ export interface Question {
   type: QuestionType
   question: string
   options?: string[]
-  required: boolean
+  required?: boolean
 }
 
 /**

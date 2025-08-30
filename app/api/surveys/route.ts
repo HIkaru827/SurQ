@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { calculateSurveyPoints } from "@/lib/points"
+import { calculateSurveyPoints, Question } from "@/lib/points"
 import { isDeveloperAccount } from "@/lib/developer"
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp, updateDoc, doc } from "firebase/firestore"
@@ -68,9 +68,9 @@ export async function GET(request: NextRequest) {
     const surveys = snapshot.docs
       .map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at,
-        updated_at: doc.data().updated_at?.toDate?.()?.toISOString() || doc.data().updated_at
+        ...(doc.data() as any),
+        created_at: (doc.data() as any).created_at?.toDate?.()?.toISOString() || (doc.data() as any).created_at,
+        updated_at: (doc.data() as any).updated_at?.toDate?.()?.toISOString() || (doc.data() as any).updated_at
       }))
       .sort((a, b) => {
         // 手動でcreated_atで降順ソート
@@ -109,7 +109,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const validatedData = validateInput(SurveySchema, body)
     
     // ポイント計算
-    const points = calculateSurveyPoints(validatedData.questions)
+    const points = calculateSurveyPoints(validatedData.questions as Question[])
 
     const surveyData = {
       title: validatedData.title,

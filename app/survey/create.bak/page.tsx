@@ -33,18 +33,10 @@ import {
   calculateSurveyPoints, 
   getQuestionTypeLabel, 
   getQuestionTypeDescription,
-  POINT_RATES 
+  POINT_RATES,
+  QuestionType,
+  Question
 } from "@/lib/points"
-
-type QuestionType = "multiple-choice" | "rating" | "text" | "yes-no"
-
-interface Question {
-  id: string
-  type: QuestionType
-  question: string
-  options?: string[]
-  required: boolean
-}
 
 interface Survey {
   title: string
@@ -57,12 +49,6 @@ interface PointCalculation {
   creatorPoints: number
 }
 
-const POINT_RATES = {
-  "yes-no": { respondent: 0.5, creator: 1 },
-  "rating": { respondent: 1.0, creator: 2 },
-  "multiple-choice": { respondent: 1.0, creator: 2.5 },
-  "text": { respondent: 1.5, creator: 5 }
-} as const
 
 const MAX_QUESTIONS = 30
 
