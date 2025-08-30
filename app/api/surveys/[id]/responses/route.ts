@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
+import { withAuth, createErrorResponse, validateOrigin, authenticateUser } from "@/lib/auth-middleware"
+import { validateInput, ResponseSchema, EmailSchema } from "@/lib/validation"
 
 // Firebase client config for server-side usage
 const firebaseConfig = {
@@ -22,10 +24,11 @@ if (!getApps().length) {
 
 const db = getFirestore(app)
 
-export async function POST(
+export const POST = withAuth(async (
   request: NextRequest,
+  user,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   try {
     const { id: surveyId } = await params
     const body = await request.json()
@@ -121,23 +124,30 @@ export async function POST(
 
   } catch (error) {
     console.error('Error submitting survey response:', error)
-    return NextResponse.json({ 
-      error: "回答の送信に失敗しました",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    const message = error instanceof Error ? error.message : '回答の送信に失敗しました'
+    return createErrorResponse(message, 500)
   }
-}
+})
 
-export async function GET(
+export const GET = withAuth(async (
   request: NextRequest,
+  user,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   try {
     const { id: surveyId } = await params
     const { searchParams } = new URL(request.url)
     const email = searchParams.get('email')
 
     if (email) {
+      // Validate email parameter and authorization
+      validateInput(EmailSchema, { email })
+      
+      // Users can only check their own response status
+      if (user.email !== email) {
+        return createErrorResponse('Unauthorized: Can only check own response status', 403)
+      }
+      
       // 特定ユーザーの回答をチェック
       const responseQuery = query(
         collection(db, 'survey_responses'),
@@ -172,9 +182,7 @@ export async function GET(
 
   } catch (error) {
     console.error('Error fetching survey responses:', error)
-    return NextResponse.json({ 
-      error: "回答の取得に失敗しました",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    const message = error instanceof Error ? error.message : '回答の取得に失敗しました'
+    return createErrorResponse(message, 500)
   }
-}
+})

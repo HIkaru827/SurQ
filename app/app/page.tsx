@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import { isDeveloperAccount } from '@/lib/developer'
+import { authenticatedFetch } from '@/lib/api-client'
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -122,7 +123,7 @@ export default function AppPage() {
       const surveysWithStatus = await Promise.all(
         surveys.map(async (survey) => {
           try {
-            const response = await fetch(`/api/surveys/${survey.id}/responses?email=${encodeURIComponent(user.email!)}`)
+            const response = await authenticatedFetch(`/api/surveys/${survey.id}/responses?email=${encodeURIComponent(user.email!)}`)
             if (response.ok) {
               const data = await response.json()
               return { ...survey, has_answered: data.hasResponded }
@@ -141,10 +142,10 @@ export default function AppPage() {
   }
 
   const fetchUserSurveys = async () => {
-    if (!currentUser?.id) return
+    if (!currentUser?.id || !user) return
     
     try {
-      const response = await fetch(`/api/surveys?creator_id=${currentUser.id}`)
+      const response = await authenticatedFetch(`/api/surveys?creator_id=${currentUser.id}`)
       if (response.ok) {
         const data = await response.json()
         setUserSurveys(data.surveys || [])

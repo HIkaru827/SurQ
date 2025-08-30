@@ -128,3 +128,25 @@ export function validateOrigin(request: NextRequest): boolean {
   
   return !origin || allowedOrigins.includes(origin)
 }
+
+/**
+ * Global error handler for authentication failures
+ */
+export function handleAuthError(error: any): NextResponse {
+  console.error('Authentication error:', error)
+  
+  if (error.message?.includes('Token verification failed')) {
+    return createErrorResponse('認証トークンが無効です。再ログインしてください。', 401)
+  }
+  
+  if (error.message?.includes('No valid authorization header')) {
+    return createErrorResponse('認証が必要です。ログインしてください。', 401)
+  }
+  
+  if (error.message?.includes('Forbidden')) {
+    return createErrorResponse('このリソースにアクセスする権限がありません。', 403)
+  }
+  
+  // Default authentication error
+  return createErrorResponse('認証に失敗しました。', 401)
+}

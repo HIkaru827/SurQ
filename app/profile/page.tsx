@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { isDeveloperAccount } from '@/lib/developer'
+import { authenticatedFetch } from '@/lib/api-client'
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -239,7 +240,7 @@ export default function ProfilePage() {
     if (!user?.email) return
     
     try {
-      const response = await fetch(`/api/coupons?email=${encodeURIComponent(user.email)}`)
+      const response = await authenticatedFetch(`/api/coupons?email=${encodeURIComponent(user.email)}`)
       if (response.ok) {
         const data = await response.json()
         setCouponHistory(data.history || [])
@@ -266,11 +267,8 @@ export default function ProfilePage() {
 
     setCouponLoading(true)
     try {
-      const response = await fetch('/api/coupons', {
+      const response = await authenticatedFetch('/api/coupons', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           email: user.email,
           couponCode: couponCode.trim()

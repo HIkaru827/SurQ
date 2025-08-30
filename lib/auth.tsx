@@ -45,7 +45,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // プロフィールを強制的に再読み込みする関数
   const refreshUserProfile = async (firebaseUser: FirebaseUser) => {
     try {
-      const response = await fetch(`/api/users?email=${encodeURIComponent(firebaseUser.email!)}`)
+      // Get auth token for authenticated API call
+      const token = await firebaseUser.getIdToken()
+      const response = await fetch(`/api/users?email=${encodeURIComponent(firebaseUser.email!)}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
       if (response.ok) {
         const data = await response.json()
         setUserProfile(data.user)
@@ -85,7 +92,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
 
           // emailベースでユーザーを取得（APIと同じ方法）
-          const response = await fetch(`/api/users?email=${encodeURIComponent(firebaseUser.email!)}`)
+          const token = await firebaseUser.getIdToken()
+          const response = await fetch(`/api/users?email=${encodeURIComponent(firebaseUser.email!)}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          })
           if (response.ok) {
             const data = await response.json()
             setUserProfile(data.user)

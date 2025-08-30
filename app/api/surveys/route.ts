@@ -32,6 +32,19 @@ export async function GET(request: NextRequest) {
     const includeUnpublished = searchParams.get('include_unpublished') === 'true'
     const creatorId = searchParams.get('creator_id')
     
+    // creator_idが指定された場合は認証が必要
+    if (creatorId) {
+      try {
+        const user = await authenticateUser(request)
+        // ユーザーは自分のアンケートのみ取得可能
+        if (user.email !== creatorId) {
+          return createErrorResponse('Unauthorized: Can only access own surveys', 403)
+        }
+      } catch (error) {
+        return createErrorResponse('Authentication required for user surveys', 401)
+      }
+    }
+    
     let surveysQuery
     
     if (creatorId) {

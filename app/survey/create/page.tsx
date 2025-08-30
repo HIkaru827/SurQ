@@ -6,6 +6,7 @@ import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth"
 import { isDeveloperAccount } from "@/lib/developer"
+import { authenticatedFetch } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -143,7 +144,7 @@ function CreateSurveyPageInner() {
   const loadSurveyForEdit = async (surveyId: string) => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/surveys?include_unpublished=true`)
+      const response = await authenticatedFetch(`/api/surveys?include_unpublished=true`)
       if (response.ok) {
         const data = await response.json()
         const surveyToEdit = data.surveys.find((s: any) => s.id === surveyId)
@@ -210,11 +211,8 @@ function CreateSurveyPageInner() {
       const url = editSurveyId ? `/api/surveys/${editSurveyId}` : '/api/surveys'
       const method = editSurveyId ? 'PUT' : 'POST'
       
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method: method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           ...survey,
           creator_id: creatorId,
@@ -257,11 +255,8 @@ function CreateSurveyPageInner() {
       const url = editSurveyId ? `/api/surveys/${editSurveyId}` : '/api/surveys'
       const method = editSurveyId ? 'PUT' : 'POST'
       
-      const response = await fetch(url, {
+      const response = await authenticatedFetch(url, {
         method: method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           ...survey,
           creator_id: creatorId,
