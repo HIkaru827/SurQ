@@ -3,6 +3,8 @@ import { calculateSurveyPoints } from "@/lib/points"
 import { isDeveloperAccount } from "@/lib/developer"
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp, updateDoc, doc } from "firebase/firestore"
+import { withAuth, createErrorResponse, validateOrigin, authenticateUser } from "@/lib/auth-middleware"
+import { validateInput, SurveySchema, QueryParamsSchema, validateSufficientPoints } from "@/lib/validation"
 
 // Firebase client config for server-side usage
 const firebaseConfig = {
@@ -81,49 +83,52 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, user) => {
   try {
+    // Validate origin
+    if (!validateOrigin(request)) {
+      return createErrorResponse('Invalid origin', 403)
+    }
+
     const body = await request.json()
     
+    // Validate input data
+    const validatedData = validateInput(SurveySchema, body)
+    
     // ポイント計算
-    const points = calculateSurveyPoints(body.questions || [])
+    const points = calculateSurveyPoints(validatedData.questions)
 
     const surveyData = {
-      title: body.title,
-      description: body.description || null,
-      creator_id: body.creator_id || 'anonymous-user',
-      questions: body.questions || [],
-      is_published: body.is_published || false,
-      respondent_points: points.respondentPoints,
-      creator_points: points.creatorPoints,
+      title: validatedData.title,
+      description: validatedData.description || null,
+      creator_id: user.email, // Use authenticated user's email
+      questions: validatedData.questions,
+      is_published: validatedData.is_published || false,
+      respondent_points: validatedData.respondent_points,
+      creator_points: validatedData.creator_points,
       response_count: 0,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
     }
 
     // 公開時はユーザーのポイントをチェック・消費（開発者アカウントはスキップ）
-    if (body.is_published && body.creator_id !== 'anonymous-user' && body.creator_email) {
-      const isDevAccount = isDeveloperAccount(body.creator_email)
+    if (validatedData.is_published) {
+      const isDevAccount = isDeveloperAccount(user.email!)
       
       if (!isDevAccount) {
-        const usersQuery = query(collection(db, 'users'), where('email', '==', body.creator_email))
+        const usersQuery = query(collection(db, 'users'), where('email', '==', user.email))
         const userSnapshot = await getDocs(usersQuery)
         
         if (!userSnapshot.empty) {
           const userDoc = userSnapshot.docs[0]
           const currentPoints = userDoc.data().points || 0
           
-          if (currentPoints < points.creatorPoints) {
-            return NextResponse.json({ 
-              error: "Insufficient points",
-              required: points.creatorPoints,
-              current: currentPoints
-            }, { status: 400 })
-          }
+          // Validate sufficient points
+          validateSufficientPoints(currentPoints, validatedData.creator_points)
           
           // ポイント消費
           await updateDoc(doc(db, 'users', userDoc.id), {
-            points: currentPoints - points.creatorPoints,
+            points: currentPoints - validatedData.creator_points,
             updated_at: serverTimestamp()
           })
         }
@@ -144,9 +149,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ survey: createdSurvey }, { status: 201 })
   } catch (error) {
     console.error('Error creating survey:', error)
-    return NextResponse.json({ 
-      error: "Failed to create survey",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to create survey'
+    return createErrorResponse(message, 500)
   }
-}
+})

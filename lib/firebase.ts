@@ -13,12 +13,12 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
-// Debug: Check if config is properly loaded
-if (typeof window !== 'undefined') {
-  console.log('Firebase config loaded:', {
-    apiKey: firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 10)}...` : 'MISSING',
-    authDomain: firebaseConfig.authDomain || 'MISSING',
-    projectId: firebaseConfig.projectId || 'MISSING',
+// Debug: Check if config is properly loaded (only in development)
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log('Firebase config validation:', {
+    apiKey: firebaseConfig.apiKey ? 'CONFIGURED' : 'MISSING',
+    authDomain: firebaseConfig.authDomain ? 'CONFIGURED' : 'MISSING',
+    projectId: firebaseConfig.projectId ? 'CONFIGURED' : 'MISSING',
     environment: process.env.NODE_ENV
   })
   

@@ -482,40 +482,40 @@ function CreateSurveyPageInner() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" size="sm" asChild>
+            <Button variant="ghost" size="sm" asChild className="p-2 sm:px-3">
               <Link href="/app">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                戻る
+                <ArrowLeft className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline text-sm">戻る</span>
               </Link>
             </Button>
-            <div className="flex items-center space-x-3">
-              <h1 className="font-semibold text-foreground">{editSurveyId ? 'アンケート編集' : 'アンケート作成'}</h1>
+            <div className="flex items-center space-x-1 sm:space-x-3 flex-1 justify-center">
+              <h1 className="font-semibold text-foreground text-sm sm:text-base">{editSurveyId ? 'アンケート編集' : 'アンケート作成'}</h1>
               {user && (
-                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-medium">
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-medium text-xs sm:text-sm px-2 py-1">
                   <Star className="w-3 h-3 mr-1" />
                   {userPoints.toLocaleString()}pt
                 </Badge>
               )}
             </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={() => setShowPreview(true)}>
-                <Eye className="w-4 h-4 mr-2" />
-                プレビュー
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <Button variant="outline" size="sm" onClick={() => setShowPreview(true)} className="p-2 sm:px-3">
+                <Eye className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline text-sm">プレビュー</span>
               </Button>
               <Button 
                 size="sm" 
                 onClick={handlePublish}
                 disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || !hasEnoughPoints}
-                className={!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'opacity-50 cursor-not-allowed' : ''}
+                className={`p-2 sm:px-3 ${!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {isPublishing ? (
-                  <>公開中...</>
+                  <span className="text-sm">公開中...</span>
                 ) : (
                   <>
-                    <Send className="w-4 h-4 mr-2" />
-                    公開
+                    <Send className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline text-sm">公開</span>
                   </>
                 )}
               </Button>

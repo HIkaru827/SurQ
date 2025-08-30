@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { isDeveloperAccount, DEVELOPER_CONFIG } from "@/lib/developer"
+import { withAuth, createErrorResponse, validateOrigin } from "@/lib/auth-middleware"
+import { validateInput, UserSchema, EmailSchema } from "@/lib/validation"
 
 // Firebase client config for server-side usage
 const firebaseConfig = {
@@ -23,10 +25,21 @@ if (!getApps().length) {
 
 const db = getFirestore(app)
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, user) => {
   try {
+    // Validate origin
+    if (!validateOrigin(request)) {
+      return createErrorResponse('Invalid origin', 403)
+    }
+
     const body = await request.json()
-    const { email, name } = body
+    const validatedData = validateInput(UserSchema.pick({ email: true, name: true }), body)
+    const { email, name } = validatedData
+
+    // Verify the authenticated user matches the email being processed
+    if (user.email !== email) {
+      return createErrorResponse('Unauthorized: Email mismatch', 403)
+    }
 
     // 既存ユーザーをチェック
     const usersQuery = query(collection(db, 'users'), where('email', '==', email))
@@ -81,17 +94,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ user: newUser }, { status: 201 })
   } catch (error) {
     console.error('Error managing user:', error)
-    return NextResponse.json({ 
-      error: "Failed to manage user",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to manage user'
+    return createErrorResponse(message, 500)
   }
-}
+})
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest, user) => {
   try {
+    // Validate origin
+    if (!validateOrigin(request)) {
+      return createErrorResponse('Invalid origin', 403)
+    }
+
     const { searchParams } = new URL(request.url)
     const email = searchParams.get('email')
+
+    // Validate email parameter
+    if (email) {
+      validateInput(EmailSchema, { email })
+      
+      // Users can only access their own profile
+      if (user.email !== email) {
+        return createErrorResponse('Unauthorized: Can only access own profile', 403)
+      }
+    }
     
     if (email) {
       const usersQuery = query(collection(db, 'users'), where('email', '==', email))
@@ -108,19 +134,15 @@ export async function GET(request: NextRequest) {
         }
         return NextResponse.json({ user: userData })
       } else {
-        return NextResponse.json({ error: "User not found" }, { status: 404 })
+        return createErrorResponse('User not found', 404)
       }
     }
     
-    // For now, we'll not implement listing all users for security reasons
-    return NextResponse.json({ 
-      error: "Listing all users not supported" 
-    }, { status: 400 })
+    // Listing all users not supported for security reasons
+    return createErrorResponse('Listing all users not supported', 400)
   } catch (error) {
     console.error('Error fetching users:', error)
-    return NextResponse.json({ 
-      error: "Failed to fetch users",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to fetch users'
+    return createErrorResponse(message, 500)
   }
-}
+})

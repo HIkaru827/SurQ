@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore, collection, query, where, getDocs, updateDoc, doc, serverTimestamp, addDoc } from "firebase/firestore"
+import { getFirestore, collection, query, where, getDocs, updateDoc, doc, serverTimestamp, addDoc, runTransaction } from "firebase/firestore"
+import { withAuth, createErrorResponse, validateOrigin } from "@/lib/auth-middleware"
+import { validateInput, CouponSchema, EmailSchema } from "@/lib/validation"
 
 // Firebase client config for server-side usage
 const firebaseConfig = {
@@ -22,113 +24,139 @@ if (!getApps().length) {
 
 const db = getFirestore(app)
 
-// Valid coupons and their point values
-const VALID_COUPONS = {
-  'NEW2025': { points: 200, description: 'ウェルカムボーナス' },
-  'BONUS100': { points: 100, description: 'ボーナスポイント' },
-  'FIRST50': { points: 50, description: '初回利用ボーナス' },
+// Load valid coupons from environment variables for security
+function getValidCoupons() {
+  const couponsEnv = process.env.VALID_COUPONS || ''
+  const coupons: Record<string, { points: number; description: string }> = {}
+  
+  couponsEnv.split(',').forEach(couponStr => {
+    const [code, points, description] = couponStr.split(':')
+    if (code && points && description) {
+      coupons[code.trim()] = {
+        points: parseInt(points.trim()),
+        description: description.trim()
+      }
+    }
+  })
+  
+  return coupons
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, user) => {
   try {
-    const body = await request.json()
-    const { email, couponCode } = body
+    // Validate origin
+    if (!validateOrigin(request)) {
+      return createErrorResponse('Invalid origin', 403)
+    }
 
-    if (!email || !couponCode) {
-      return NextResponse.json({ 
-        error: "メールアドレスとクーポンコードが必要です" 
-      }, { status: 400 })
+    const body = await request.json()
+    const validatedData = validateInput(CouponSchema, body)
+    const { email, couponCode } = validatedData
+
+    // Verify the authenticated user matches the email
+    if (user.email !== email) {
+      return createErrorResponse('Unauthorized: Email mismatch', 403)
     }
 
     // クーポンコードの検証
     const upperCouponCode = couponCode.toUpperCase()
-    const couponData = VALID_COUPONS[upperCouponCode as keyof typeof VALID_COUPONS]
+    const validCoupons = getValidCoupons()
+    const couponData = validCoupons[upperCouponCode]
     
     if (!couponData) {
-      return NextResponse.json({ 
-        error: "このクーポンは無効です" 
-      }, { status: 400 })
+      return createErrorResponse('このクーポンは無効です', 400)
     }
 
-    // 既にこのクーポンを使用したかチェック（簡略化）
-    try {
+    // Use transaction to prevent race conditions
+    const result = await runTransaction(db, async (transaction) => {
+      // Check if coupon already used
       const existingCouponQuery = query(
         collection(db, 'coupon_history'),
-        where('user_email', '==', email)
+        where('user_email', '==', email),
+        where('coupon_code', '==', upperCouponCode)
       )
       const existingCouponSnapshot = await getDocs(existingCouponQuery)
       
-      // 手動でクーポンコードをチェック
-      const alreadyUsed = existingCouponSnapshot.docs.some(doc => 
-        doc.data().coupon_code === upperCouponCode
-      )
-      
-      if (alreadyUsed) {
-        return NextResponse.json({ 
-          error: "このクーポンは使用済みです" 
-        }, { status: 400 })
+      if (!existingCouponSnapshot.empty) {
+        throw new Error('このクーポンは使用済みです')
       }
-    } catch (error) {
-      console.warn('Coupon duplicate check failed, proceeding:', error)
-      // 重複チェックに失敗した場合は続行（初回使用の場合）
-    }
 
-    // ユーザーを検索
-    const usersQuery = query(collection(db, 'users'), where('email', '==', email))
-    const userSnapshot = await getDocs(usersQuery)
-    
-    if (userSnapshot.empty) {
-      return NextResponse.json({ 
-        error: "ユーザーが見つかりません" 
-      }, { status: 404 })
-    }
+      // Find user
+      const usersQuery = query(collection(db, 'users'), where('email', '==', email))
+      const userSnapshot = await getDocs(usersQuery)
+      
+      if (userSnapshot.empty) {
+        throw new Error('ユーザーが見つかりません')
+      }
 
-    const userDoc = userSnapshot.docs[0]
-    const userData = userDoc.data()
-    const currentPoints = userData.points || 0
+      const userDoc = userSnapshot.docs[0]
+      const userData = userDoc.data()
+      const currentPoints = userData.points || 0
+      const newPoints = currentPoints + couponData.points
 
-    // ポイントを更新
-    await updateDoc(doc(db, 'users', userDoc.id), {
-      points: currentPoints + couponData.points,
-      updated_at: serverTimestamp()
-    })
+      // Update user points
+      const userRef = doc(db, 'users', userDoc.id)
+      transaction.update(userRef, {
+        points: newPoints,
+        updated_at: serverTimestamp()
+      })
 
-    // クーポン使用履歴を保存
-    await addDoc(collection(db, 'coupon_history'), {
-      user_id: userDoc.id,
-      user_email: email,
-      coupon_code: upperCouponCode,
-      points_added: couponData.points,
-      description: couponData.description,
-      used_at: serverTimestamp(),
-      created_at: serverTimestamp()
+      // Add coupon history
+      const historyRef = doc(collection(db, 'coupon_history'))
+      transaction.set(historyRef, {
+        user_id: userDoc.id,
+        user_email: email,
+        coupon_code: upperCouponCode,
+        points_added: couponData.points,
+        description: couponData.description,
+        used_at: serverTimestamp(),
+        created_at: serverTimestamp()
+      })
+
+      return {
+        pointsAdded: couponData.points,
+        newTotal: newPoints,
+        description: couponData.description
+      }
     })
 
     return NextResponse.json({
       success: true,
-      pointsAdded: couponData.points,
-      newTotal: currentPoints + couponData.points,
-      description: couponData.description
+      ...result
     })
 
   } catch (error) {
     console.error('Error applying coupon:', error)
-    return NextResponse.json({ 
-      error: "クーポンの適用に失敗しました",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'クーポンの適用に失敗しました'
+    
+    // Return specific error messages for known cases
+    if (message === 'このクーポンは使用済みです' || message === 'ユーザーが見つかりません') {
+      return createErrorResponse(message, 400)
+    }
+    
+    return createErrorResponse('クーポンの適用に失敗しました', 500)
   }
-}
+})
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: NextRequest, user) => {
   try {
+    // Validate origin
+    if (!validateOrigin(request)) {
+      return createErrorResponse('Invalid origin', 403)
+    }
+
     const { searchParams } = new URL(request.url)
     const email = searchParams.get('email')
 
     if (!email) {
-      return NextResponse.json({ 
-        error: "メールアドレスが必要です" 
-      }, { status: 400 })
+      return createErrorResponse('メールアドレスが必要です', 400)
+    }
+
+    // Validate email parameter and authorization
+    validateInput(EmailSchema, { email })
+    
+    if (user.email !== email) {
+      return createErrorResponse('Unauthorized: Can only access own coupon history', 403)
     }
 
     // クーポン履歴を取得（orderByを削除してIndex不要にする）
@@ -152,9 +180,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching coupon history:', error)
-    return NextResponse.json({ 
-      error: "クーポン履歴の取得に失敗しました",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'クーポン履歴の取得に失敗しました'
+    return createErrorResponse(message, 500)
   }
-}
+})
