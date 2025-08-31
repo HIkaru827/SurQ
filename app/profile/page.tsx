@@ -439,9 +439,12 @@ export default function ProfilePage() {
       const response = await fetch(`/api/users/${encodeURIComponent(user.email)}/answered-surveys`)
       if (response.ok) {
         const data = await response.json()
+        console.log('Answered surveys API response:', data)
+        console.log('User email used:', user.email)
+        console.log('Answered surveys found:', data.surveys?.length || 0)
         setAnsweredSurveys(data.surveys || [])
       } else {
-        console.error('Failed to fetch answered surveys')
+        console.error('Failed to fetch answered surveys', response.status, response.statusText)
         setAnsweredSurveys([])
       }
     } catch (error) {

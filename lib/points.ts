@@ -26,6 +26,7 @@ export interface Question {
   options?: string[]
   required?: boolean
   allowOther?: boolean
+  allowMultiple?: boolean
 }
 
 /**

@@ -24,11 +24,10 @@ if (!getApps().length) {
 
 const db = getFirestore(app)
 
-export const POST = withAuth(async (
+export async function POST(
   request: NextRequest,
-  user,
   { params }: { params: Promise<{ id: string }> }
-) => {
+) {
   try {
     const { id: surveyId } = await params
     const body = await request.json()
@@ -85,6 +84,7 @@ export const POST = withAuth(async (
 
     // 回答者にポイントを付与
     if (respondent_email) {
+      console.log('Awarding points to user:', respondent_email, 'Points:', surveyData.respondent_points)
       const usersQuery = query(collection(db, 'users'), where('email', '==', respondent_email))
       const userSnapshot = await getDocs(usersQuery)
       
@@ -92,14 +92,25 @@ export const POST = withAuth(async (
         // 既存ユーザーのポイント更新
         const userDoc = userSnapshot.docs[0]
         const currentPoints = userDoc.data().points || 0
+        const newPoints = currentPoints + (surveyData.respondent_points || 0)
+        
+        console.log('Updating existing user points:', {
+          email: respondent_email,
+          currentPoints,
+          pointsToAdd: surveyData.respondent_points,
+          newPoints
+        })
         
         await updateDoc(doc(db, 'users', userDoc.id), {
-          points: currentPoints + (surveyData.respondent_points || 0),
+          points: newPoints,
           surveys_answered: (userDoc.data().surveys_answered || 0) + 1,
           updated_at: serverTimestamp()
         })
+        
+        console.log('Points updated successfully')
       } else {
         // ユーザーが存在しない場合、新規作成
+        console.log('Creating new user with points:', surveyData.respondent_points)
         const newUserData = {
           name: respondent_name || 'Anonymous User',
           email: respondent_email,
@@ -113,6 +124,7 @@ export const POST = withAuth(async (
         }
         
         await addDoc(collection(db, 'users'), newUserData)
+        console.log('New user created successfully')
       }
     }
 
@@ -127,7 +139,7 @@ export const POST = withAuth(async (
     const message = error instanceof Error ? error.message : '回答の送信に失敗しました'
     return createErrorResponse(message, 500)
   }
-})
+}
 
 export const GET = withAuth(async (
   request: NextRequest,

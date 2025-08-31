@@ -717,17 +717,31 @@ function CreateSurveyPageInner() {
                       </div>
                       
                       {question.type === "multiple-choice" && (
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={`allow-other-${question.id}`}
-                            checked={question.allowOther || false}
-                            onChange={(e) => updateQuestion(question.id, { allowOther: e.target.checked })}
-                            className="rounded border-border"
-                          />
-                          <Label htmlFor={`allow-other-${question.id}`} className="text-sm">
-                            「その他」を許可
-                          </Label>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`allow-multiple-${question.id}`}
+                              checked={question.allowMultiple || false}
+                              onChange={(e) => updateQuestion(question.id, { allowMultiple: e.target.checked })}
+                              className="rounded border-border"
+                            />
+                            <Label htmlFor={`allow-multiple-${question.id}`} className="text-sm">
+                              複数回答を許可
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`allow-other-${question.id}`}
+                              checked={question.allowOther || false}
+                              onChange={(e) => updateQuestion(question.id, { allowOther: e.target.checked })}
+                              className="rounded border-border"
+                            />
+                            <Label htmlFor={`allow-other-${question.id}`} className="text-sm">
+                              「その他」を許可
+                            </Label>
+                          </div>
                         </div>
                       )}
                     </div>

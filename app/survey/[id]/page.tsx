@@ -269,6 +269,13 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
 
     setSubmitting(true)
     try {
+      console.log('Submitting survey response:', {
+        surveyId,
+        respondentEmail,
+        respondentName,
+        answers
+      })
+      
       const response = await fetch(`/api/surveys/${surveyId}/responses`, {
         method: 'POST',
         headers: {
@@ -282,6 +289,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       })
 
       const data = await response.json()
+      console.log('Survey submission response:', data)
 
       if (response.ok && data.success) {
         setIsCompleted(true)
@@ -322,8 +330,31 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
 
   const currentQ = survey.questions[currentQuestion]
   const currentAnswer = answers[currentQ?.id]
-  const canProceed = currentAnswer !== undefined && currentAnswer !== "" && 
-    (!currentAnswer.startsWith('__other__:') || currentAnswer.replace('__other__:', '').trim() !== '')
+  const canProceed = (() => {
+    if (!currentAnswer || currentAnswer === "") return false
+    
+    // Multiple selection questions
+    if ((currentQ as any)?.allowMultiple && currentAnswer.includes('__SEPARATOR__')) {
+      const parts = currentAnswer.split('__SEPARATOR__')
+      const selectedOptions = parts.filter(item => item.startsWith('__selected__:'))
+      const otherPart = parts.find(item => item.startsWith('__other__:'))
+      
+      // Need at least one selected option or a valid other answer
+      if (selectedOptions.length === 0 && !otherPart) return false
+      
+      // If other is selected, it needs text
+      if (otherPart && otherPart.replace('__other__:', '').trim() === '') return false
+      
+      return true
+    }
+    
+    // Single selection questions with "other" option
+    if (currentAnswer.startsWith('__other__:')) {
+      return currentAnswer.replace('__other__:', '').trim() !== ''
+    }
+    
+    return true
+  })()
 
   if (isCompleted) {
     return (
@@ -471,54 +502,139 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
             {/* Multiple Choice Questions */}
             {currentQ.type === "multiple-choice" && (
               <div className="space-y-3">
-                <RadioGroup
-                  value={currentAnswer?.startsWith('__other__:') ? '__other__' : currentAnswer}
-                  onValueChange={(value) => {
-                    if (value === '__other__') {
-                      // "その他" was selected, keep existing custom text if any
-                      if (!currentAnswer?.startsWith('__other__:')) {
-                        handleAnswer(currentQ.id, '__other__:')
+                {(currentQ as any).allowMultiple ? (
+                  // Checkbox mode for multiple selection
+                  <div className="space-y-3">
+                    {currentQ.options?.map((option: string, index: number) => {
+                      const isChecked = currentAnswer?.includes(`__selected__:${option}`) || false
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            id={`option-${index}`}
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const selectedOptions = currentAnswer ? currentAnswer.split('__SEPARATOR__').filter(item => item.startsWith('__selected__:')) : []
+                              const otherAnswer = currentAnswer?.split('__SEPARATOR__').find(item => item.startsWith('__other__:')) || ''
+                              
+                              if (e.target.checked) {
+                                selectedOptions.push(`__selected__:${option}`)
+                              } else {
+                                const optionIndex = selectedOptions.indexOf(`__selected__:${option}`)
+                                if (optionIndex > -1) {
+                                  selectedOptions.splice(optionIndex, 1)
+                                }
+                              }
+                              
+                              const newAnswer = [...selectedOptions, ...(otherAnswer ? [otherAnswer] : [])].join('__SEPARATOR__')
+                              handleAnswer(currentQ.id, newAnswer)
+                            }}
+                            className="rounded border-border"
+                          />
+                          <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
+                            {option}
+                          </Label>
+                        </div>
+                      )
+                    })}
+                    
+                    {(currentQ as any).allowOther && (
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                          <input
+                            type="checkbox"
+                            id="other-option"
+                            checked={currentAnswer?.includes('__other__:') || false}
+                            onChange={(e) => {
+                              const selectedOptions = currentAnswer ? currentAnswer.split('__SEPARATOR__').filter(item => item.startsWith('__selected__:')) : []
+                              
+                              if (e.target.checked) {
+                                const newAnswer = [...selectedOptions, '__other__:'].join('__SEPARATOR__')
+                                handleAnswer(currentQ.id, newAnswer)
+                              } else {
+                                const newAnswer = selectedOptions.join('__SEPARATOR__')
+                                handleAnswer(currentQ.id, newAnswer)
+                              }
+                            }}
+                            className="rounded border-border"
+                          />
+                          <Label htmlFor="other-option" className="cursor-pointer text-base">
+                            その他
+                          </Label>
+                        </div>
+                        
+                        {currentAnswer?.includes('__other__:') && (
+                          <div className="ml-8">
+                            <Input
+                              placeholder="具体的に入力してください"
+                              value={currentAnswer.split('__SEPARATOR__').find(item => item.startsWith('__other__:'))?.replace('__other__:', '') || ''}
+                              onChange={(e) => {
+                                const selectedOptions = currentAnswer ? currentAnswer.split('__SEPARATOR__').filter(item => item.startsWith('__selected__:')) : []
+                                const newOtherValue = e.target.value ? `__other__:${e.target.value}` : ''
+                                const newAnswer = [...selectedOptions, ...(newOtherValue ? [newOtherValue] : [])].join('__SEPARATOR__')
+                                handleAnswer(currentQ.id, newAnswer)
+                              }}
+                              className="text-base"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Radio button mode for single selection
+                  <RadioGroup
+                    value={currentAnswer?.startsWith('__other__:') ? '__other__' : currentAnswer}
+                    onValueChange={(value) => {
+                      if (value === '__other__') {
+                        // "その他" was selected, keep existing custom text if any
+                        if (!currentAnswer?.startsWith('__other__:')) {
+                          handleAnswer(currentQ.id, '__other__:')
+                        }
+                      } else {
+                        handleAnswer(currentQ.id, value)
                       }
-                    } else {
-                      handleAnswer(currentQ.id, value)
-                    }
-                  }}
-                  className="space-y-3"
-                >
-                  {currentQ.options?.map((option: string, index: number) => (
-                    <div
-                      key={index}
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <RadioGroupItem value={option} id={`option-${index}`} />
-                      <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
-                        {option}
-                      </Label>
-                    </div>
-                  ))}
-                  
-                  {(currentQ as any).allowOther && (
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                        <RadioGroupItem value="__other__" id="other-option" />
-                        <Label htmlFor="other-option" className="cursor-pointer text-base">
-                          その他
+                    }}
+                    className="space-y-3"
+                  >
+                    {currentQ.options?.map((option: string, index: number) => (
+                      <div
+                        key={index}
+                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <RadioGroupItem value={option} id={`option-${index}`} />
+                        <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
+                          {option}
                         </Label>
                       </div>
-                      
-                      {currentAnswer?.startsWith('__other__:') && (
-                        <div className="ml-8">
-                          <Input
-                            placeholder="具体的に入力してください"
-                            value={currentAnswer.replace('__other__:', '')}
-                            onChange={(e) => handleAnswer(currentQ.id, '__other__:' + e.target.value)}
-                            className="text-base"
-                          />
+                    ))}
+                    
+                    {(currentQ as any).allowOther && (
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                          <RadioGroupItem value="__other__" id="other-option" />
+                          <Label htmlFor="other-option" className="cursor-pointer text-base">
+                            その他
+                          </Label>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </RadioGroup>
+                        
+                        {currentAnswer?.startsWith('__other__:') && (
+                          <div className="ml-8">
+                            <Input
+                              placeholder="具体的に入力してください"
+                              value={currentAnswer.replace('__other__:', '')}
+                              onChange={(e) => handleAnswer(currentQ.id, '__other__:' + e.target.value)}
+                              className="text-base"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </RadioGroup>
+                )}
               </div>
             )}
 
