@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { Progress } from "@/components/ui/progress"
 import { 
   User, 
@@ -623,11 +624,13 @@ export default function ProfilePage() {
                 {isDevAccount ? '∞pt (開発者)' : `${localProfile.points.toLocaleString()}pt`}
               </Badge>
             </div>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <Settings className="w-4 h-4" />
-                </Button>
+            <div className="flex items-center space-x-2">
+              <NotificationBell />
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Settings className="w-4 h-4" />
+                  </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
@@ -670,7 +673,8 @@ export default function ProfilePage() {
                   </Button>
                 </div>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
 
             {/* Coupon Dialog */}
             <Dialog open={showCouponDialog} onOpenChange={setShowCouponDialog}>
@@ -776,8 +780,6 @@ export default function ProfilePage() {
                     <p className="text-sm text-muted-foreground mt-1">参加日: {formatDate(localProfile.joined_at)}</p>
                     {/* Debug info */}
                     <div className="text-xs text-muted-foreground mt-2 bg-muted/20 p-2 rounded">
-                      <div>Firebase UID: {user?.uid}</div>
-                      <div>Firebase Email: {user?.email}</div>
                       <div>開発者モード: {isDevAccount ? 'はい' : 'いいえ'}</div>
                     </div>
                   </div>
@@ -886,12 +888,6 @@ export default function ProfilePage() {
                         <p className="text-muted-foreground mb-4">
                           あなたの最初のアンケートを作成してみましょう
                         </p>
-                        {/* Debug info */}
-                        <div className="text-xs text-muted-foreground mb-4 bg-muted/20 p-2 rounded">
-                          <div>検索中のcreator_id: {user?.uid}</div>
-                          <div>ログインユーザー: {user?.email}</div>
-                          <div>Firebase UID: {user?.uid}</div>
-                        </div>
                         <Link href="/survey/create">
                           <Button>
                             <Plus className="w-4 h-4 mr-2" />
@@ -942,6 +938,16 @@ export default function ProfilePage() {
                                       <Eye className="w-4 h-4 mr-2" />
                                       詳細を見る
                                     </DropdownMenuItem>
+
+                                    {/* 回答を見る（回答者がいる場合のみ） */}
+                                    {survey.response_count > 0 && (
+                                      <DropdownMenuItem onClick={() => {
+                                        window.open(`/survey/${survey.id}/responses`, '_blank')
+                                      }}>
+                                        <BarChart3 className="w-4 h-4 mr-2" />
+                                        回答を見る ({survey.response_count}件)
+                                      </DropdownMenuItem>
+                                    )}
                                     
                                     {/* 編集する（回答者がゼロの場合のみ） */}
                                     {survey.response_count === 0 && (

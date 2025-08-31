@@ -3,6 +3,7 @@ import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
 import { withAuth, createErrorResponse, validateOrigin, authenticateUser } from "@/lib/auth-middleware"
 import { validateInput, ResponseSchema, EmailSchema } from "@/lib/validation"
+import { createSurveyResponseNotification } from "@/lib/notifications"
 
 // Firebase client config for server-side usage
 const firebaseConfig = {
@@ -126,6 +127,22 @@ export async function POST(
         await addDoc(collection(db, 'users'), newUserData)
         console.log('New user created successfully')
       }
+    }
+
+    // 通知を作成（作成者に回答通知）
+    try {
+      await createSurveyResponseNotification(
+        surveyData.creator_id,
+        surveyId,
+        surveyData.title,
+        respondent_name || 'Anonymous',
+        respondent_email,
+        surveyData.respondent_points || 0
+      )
+      console.log('Survey response notification created')
+    } catch (notificationError) {
+      console.error('Failed to create notification:', notificationError)
+      // 通知作成エラーは回答送信を妨げない
     }
 
     return NextResponse.json({

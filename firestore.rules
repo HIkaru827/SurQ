@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isValidEmail() {
+      return request.auth.token.email_verified == true;
+    }
+    
+    // Admin users (based on email)
+    function isAdmin() {
+      return request.auth.token.email in [
+        'hikarujin167@gmail.com'
+        // Add other admin emails here
+      ];
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Users can only read/write their own data
+      allow read, write: if isAuthenticated() && isOwner(userId) && isValidEmail();
+      
+      // Admins can read all user data
+      allow read: if isAuthenticated() && isAdmin();
+      
+      // Allow user creation on signup
+      allow create: if isAuthenticated() && isOwner(userId) && isValidEmail()
+        && request.resource.data.keys().hasAll(['email', 'name', 'points', 'joined_at'])
+        && request.resource.data.email == request.auth.token.email;
+    }
+    
+    // Surveys collection
+    match /surveys/{surveyId} {
+      // Anyone can read published surveys
+      allow read: if resource.data.is_published == true;
+      
+      // Survey creators can read their own surveys (published or unpublished)
+      allow read: if isAuthenticated() && isOwner(resource.data.creator_id);
+      
+      // Only authenticated users can create surveys
+      allow create: if isAuthenticated() && isValidEmail()
+        && request.resource.data.creator_id == request.auth.uid
+        && request.resource.data.keys().hasAll(['title', 'creator_id', 'questions', 'is_published', 'created_at']);
+      
+      // Only survey creators can update their own surveys
+      allow update: if isAuthenticated() && isOwner(resource.data.creator_id)
+        && request.resource.data.creator_id == resource.data.creator_id; // Prevent creator_id changes
+      
+      // Only survey creators can delete their own surveys
+      allow delete: if isAuthenticated() && isOwner(resource.data.creator_id);
+      
+      // Admins have full access
+      allow read, write: if isAuthenticated() && isAdmin();
+    }
+    
+    // Survey responses collection
+    match /survey_responses/{responseId} {
+      // Users can only read their own responses
+      allow read: if isAuthenticated() && isOwner(resource.data.user_id);
+      
+      // Survey creators can read responses to their surveys
+      allow read: if isAuthenticated() 
+        && exists(/databases/$(database)/documents/surveys/$(resource.data.survey_id))
+        && get(/databases/$(database)/documents/surveys/$(resource.data.survey_id)).data.creator_id == request.auth.uid;
+      
+      // Users can create responses (but not to their own surveys)
+      allow create: if isAuthenticated() && isValidEmail()
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.user_email == request.auth.token.email
+        && exists(/databases/$(database)/documents/surveys/$(request.resource.data.survey_id))
+        && get(/databases/$(database)/documents/surveys/$(request.resource.data.survey_id)).data.creator_id != request.auth.uid
+        && get(/databases/$(database)/documents/surveys/$(request.resource.data.survey_id)).data.is_published == true;
+      
+      // Users can update their own responses
+      allow update: if isAuthenticated() && isOwner(resource.data.user_id)
+        && request.resource.data.user_id == resource.data.user_id
+        && request.resource.data.survey_id == resource.data.survey_id;
+      
+      // Users can delete their own responses
+      allow delete: if isAuthenticated() && isOwner(resource.data.user_id);
+      
+      // Admins have full access
+      allow read, write: if isAuthenticated() && isAdmin();
+    }
+    
+    // Points transactions collection (if you add this feature)
+    match /point_transactions/{transactionId} {
+      // Users can only read their own transactions
+      allow read: if isAuthenticated() && isOwner(resource.data.user_id);
+      
+      // Only system/admins can create transactions
+      allow create: if isAuthenticated() && isAdmin();
+      
+      // Admins have full access
+      allow read, write: if isAuthenticated() && isAdmin();
+    }
+    
+    // Default deny all other operations
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

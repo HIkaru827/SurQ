@@ -9,6 +9,7 @@ import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { BarChart3, Users, Trophy, Zap, ArrowRight, PlusCircle, MessageSquare, Star, User } from "lucide-react"
 import Link from "next/link"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 
 interface Survey {
   id: string
@@ -183,6 +184,7 @@ export default function AppPage() {
                   </Badge>
                 </div>
               )}
+              <NotificationBell />
               <Link href="/profile">
                 <Button variant="ghost" size="sm" className="p-2 sm:px-3">
                   <User className="w-4 h-4 sm:mr-2" />

@@ -1,0 +1,27 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // User profile images
+    match /profiles/{userId}/{allPaths=**} {
+      // Users can only upload to their own profile folder
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Survey attachments (if needed in the future)
+    match /surveys/{surveyId}/{allPaths=**} {
+      // Survey creators can upload attachments
+      allow read, write: if request.auth != null
+        && exists(/databases/(default)/documents/surveys/$(surveyId))
+        && get(/databases/(default)/documents/surveys/$(surveyId)).data.creator_id == request.auth.uid;
+      
+      // Anyone can read attachments for published surveys
+      allow read: if exists(/databases/(default)/documents/surveys/$(surveyId))
+        && get(/databases/(default)/documents/surveys/$(surveyId)).data.is_published == true;
+    }
+    
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
