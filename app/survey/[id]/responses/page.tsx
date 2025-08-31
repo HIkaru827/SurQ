@@ -37,31 +37,42 @@ interface SurveyResponse {
   created_at: string
 }
 
-export default function SurveyResponsesPage({ params }: { params: { id: string } }) {
+export default function SurveyResponsesPage({ params }: { params: Promise<{ id: string }> }) {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [responses, setResponses] = useState<SurveyResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [surveyId, setSurveyId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (loading) return
+    const getParams = async () => {
+      const resolvedParams = await params
+      setSurveyId(resolvedParams.id)
+    }
+    getParams()
+  }, [params])
+
+  useEffect(() => {
+    if (loading || !surveyId) return
     if (!user) {
       router.push('/login')
       return
     }
     
     fetchSurveyAndResponses()
-  }, [user, loading, params.id])
+  }, [user, loading, surveyId])
 
   const fetchSurveyAndResponses = async () => {
+    if (!surveyId) return
+    
     setIsLoading(true)
     setError('')
 
     try {
       // アンケート詳細を取得
-      const surveyResponse = await authenticatedFetch(`/api/surveys/${params.id}`)
+      const surveyResponse = await authenticatedFetch(`/api/surveys/${surveyId}`)
       if (!surveyResponse.ok) {
         throw new Error('アンケートが見つかりません')
       }
@@ -75,7 +86,7 @@ export default function SurveyResponsesPage({ params }: { params: { id: string }
       setSurvey(surveyData)
 
       // 回答データを取得
-      const responsesResponse = await authenticatedFetch(`/api/surveys/${params.id}/responses`)
+      const responsesResponse = await authenticatedFetch(`/api/surveys/${surveyId}/responses`)
       if (responsesResponse.ok) {
         const responsesData = await responsesResponse.json()
         setResponses(responsesData.responses || [])
