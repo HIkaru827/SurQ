@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       try {
         const user = await authenticateUser(request)
         // ユーザーは自分のアンケートのみ取得可能
-        if (user.email !== creatorId) {
+        if (user.uid !== creatorId) {
           return createErrorResponse('Unauthorized: Can only access own surveys', 403)
         }
       } catch (error) {
@@ -114,7 +114,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const surveyData = {
       title: validatedData.title,
       description: validatedData.description || null,
-      creator_id: user.email, // Use authenticated user's email
+      creator_id: user.uid, // Use authenticated user's UID
       questions: validatedData.questions,
       is_published: validatedData.is_published || false,
       respondent_points: validatedData.respondent_points,

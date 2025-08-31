@@ -69,6 +69,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   const [respondentName, setRespondentName] = useState('')
   const [respondentEmail, setRespondentEmail] = useState('')
   const [showUserForm, setShowUserForm] = useState(false)
+  const [showSurveyInfo, setShowSurveyInfo] = useState(true)
+  const [surveyStarted, setSurveyStarted] = useState(false)
 
   useEffect(() => {
     const getParams = async () => {
@@ -177,6 +179,71 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     )
   }
 
+  // Show survey info page before starting
+  if (showSurveyInfo && !surveyStarted) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <div className="mb-6">
+            <Link href="/app">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                戻る
+              </Button>
+            </Link>
+          </div>
+
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-2xl">{survey.title}</CardTitle>
+              {survey.description && (
+                <p className="text-muted-foreground mt-2">{survey.description}</p>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-muted/30 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-primary">{survey.questions.length}</div>
+                  <div className="text-sm text-muted-foreground">質問数</div>
+                </div>
+                <div className="bg-muted/30 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-primary">{survey.respondent_points}</div>
+                  <div className="text-sm text-muted-foreground">獲得ポイント</div>
+                </div>
+                <div className="bg-muted/30 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-primary">{survey.response_count || 0}</div>
+                  <div className="text-sm text-muted-foreground">回答数</div>
+                </div>
+                <div className="bg-muted/30 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-primary">~{Math.ceil(survey.questions.length * 0.5)}</div>
+                  <div className="text-sm text-muted-foreground">予想時間（分）</div>
+                </div>
+              </div>
+
+              <div className="text-center space-y-4">
+                <div className="flex items-center justify-center space-x-2 text-primary">
+                  <Trophy className="w-5 h-5" />
+                  <span className="font-medium">回答完了で {survey.respondent_points} ポイント獲得！</span>
+                </div>
+                
+                <Button 
+                  size="lg" 
+                  className="w-full"
+                  onClick={() => {
+                    setShowSurveyInfo(false)
+                    setSurveyStarted(true)
+                  }}
+                >
+                  アンケートを開始
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   const totalQuestions = survey.questions.length
   const progress = ((currentQuestion + 1) / totalQuestions) * 100
 
@@ -190,6 +257,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       return
     }
     setShowUserForm(false)
+    setShowSurveyInfo(false)
+    setSurveyStarted(true)
   }
 
   const submitSurvey = async () => {
@@ -253,7 +322,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
 
   const currentQ = survey.questions[currentQuestion]
   const currentAnswer = answers[currentQ?.id]
-  const canProceed = currentAnswer !== undefined && currentAnswer !== ""
+  const canProceed = currentAnswer !== undefined && currentAnswer !== "" && 
+    (!currentAnswer.startsWith('__other__:') || currentAnswer.replace('__other__:', '').trim() !== '')
 
   if (isCompleted) {
     return (
@@ -400,23 +470,56 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
           <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
             {/* Multiple Choice Questions */}
             {currentQ.type === "multiple-choice" && (
-              <RadioGroup
-                value={currentAnswer}
-                onValueChange={(value) => handleAnswer(currentQ.id, value)}
-                className="space-y-3"
-              >
-                {currentQ.options?.map((option: string, index: number) => (
-                  <div
-                    key={index}
-                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <RadioGroupItem value={option} id={`option-${index}`} />
-                    <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
-                      {option}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
+              <div className="space-y-3">
+                <RadioGroup
+                  value={currentAnswer?.startsWith('__other__:') ? '__other__' : currentAnswer}
+                  onValueChange={(value) => {
+                    if (value === '__other__') {
+                      // "その他" was selected, keep existing custom text if any
+                      if (!currentAnswer?.startsWith('__other__:')) {
+                        handleAnswer(currentQ.id, '__other__:')
+                      }
+                    } else {
+                      handleAnswer(currentQ.id, value)
+                    }
+                  }}
+                  className="space-y-3"
+                >
+                  {currentQ.options?.map((option: string, index: number) => (
+                    <div
+                      key={index}
+                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <RadioGroupItem value={option} id={`option-${index}`} />
+                      <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                  
+                  {(currentQ as any).allowOther && (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                        <RadioGroupItem value="__other__" id="other-option" />
+                        <Label htmlFor="other-option" className="cursor-pointer text-base">
+                          その他
+                        </Label>
+                      </div>
+                      
+                      {currentAnswer?.startsWith('__other__:') && (
+                        <div className="ml-8">
+                          <Input
+                            placeholder="具体的に入力してください"
+                            value={currentAnswer.replace('__other__:', '')}
+                            onChange={(e) => handleAnswer(currentQ.id, '__other__:' + e.target.value)}
+                            className="text-base"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </RadioGroup>
+              </div>
             )}
 
             {/* Yes/No Questions */}

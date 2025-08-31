@@ -337,7 +337,7 @@ export default function ProfilePage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       const tab = params.get('tab')
-      if (tab && ['surveys', 'answered', 'analytics', 'achievements', 'activity', 'stats'].includes(tab)) {
+      if (tab && ['surveys', 'answered', 'analytics', 'achievements', 'activity'].includes(tab)) {
         setActiveTab(tab)
       }
     }
@@ -404,17 +404,22 @@ export default function ProfilePage() {
 
   const fetchUserSurveys = async () => {
     try {
-      // Firebase認証からユーザーIDを取得
+      // Firebase認証からユーザーUIDを取得
       if (!user?.uid) {
         setUserSurveys([])
         return
       }
       
       // ユーザー自身のアンケートのみを取得
-      const response = await fetch(`/api/surveys?creator_id=${user.uid}&include_unpublished=true`)
+      const response = await authenticatedFetch(`/api/surveys?creator_id=${user.uid}&include_unpublished=true`)
       if (response.ok) {
         const data = await response.json()
+        console.log('Survey API Response:', data)
+        console.log('Creator ID used:', user.uid)
+        console.log('Surveys found:', data.surveys?.length || 0)
         setUserSurveys(data.surveys || [])
+      } else {
+        console.error('Survey API Error:', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Error fetching user surveys:', error)
@@ -693,21 +698,6 @@ export default function ProfilePage() {
                           {couponLoading ? '適用中...' : '適用'}
                         </Button>
                       </div>
-                      
-                      <div className="text-sm text-muted-foreground">
-                        <p>有効なクーポンコード例:</p>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <Badge variant="outline" className="cursor-pointer" onClick={() => setCouponCode('NEW2025')}>
-                            NEW2025 (200pt)
-                          </Badge>
-                          <Badge variant="outline" className="cursor-pointer" onClick={() => setCouponCode('BONUS100')}>
-                            BONUS100 (100pt)
-                          </Badge>
-                          <Badge variant="outline" className="cursor-pointer" onClick={() => setCouponCode('FIRST50')}>
-                            FIRST50 (50pt)
-                          </Badge>
-                        </div>
-                      </div>
                     </CardContent>
                   </Card>
 
@@ -770,6 +760,12 @@ export default function ProfilePage() {
                     <h2 className="text-xl font-bold text-foreground">{localProfile.name}</h2>
                     <p className="text-muted-foreground">{localProfile.email}</p>
                     <p className="text-sm text-muted-foreground mt-1">参加日: {formatDate(localProfile.joined_at)}</p>
+                    {/* Debug info */}
+                    <div className="text-xs text-muted-foreground mt-2 bg-muted/20 p-2 rounded">
+                      <div>Firebase UID: {user?.uid}</div>
+                      <div>Firebase Email: {user?.email}</div>
+                      <div>開発者モード: {isDevAccount ? 'はい' : 'いいえ'}</div>
+                    </div>
                   </div>
                   
                   {/* 保有ポイント表示 */}
@@ -850,13 +846,12 @@ export default function ProfilePage() {
           {/* Main Content */}
           <div className="lg:col-span-2">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 sm:gap-0 h-auto sm:h-10 p-1">
+              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 gap-1 sm:gap-0 h-auto sm:h-10 p-1">
                 <TabsTrigger value="surveys" className="text-xs sm:text-sm py-2 px-2 sm:px-3">作成</TabsTrigger>
                 <TabsTrigger value="answered" className="text-xs sm:text-sm py-2 px-2 sm:px-3">回答済み</TabsTrigger>
                 <TabsTrigger value="analytics" className="text-xs sm:text-sm py-2 px-2 sm:px-3">分析</TabsTrigger>
                 <TabsTrigger value="achievements" className="text-xs sm:text-sm py-2 px-2 sm:px-3">実績</TabsTrigger>
                 <TabsTrigger value="activity" className="text-xs sm:text-sm py-2 px-2 sm:px-3">活動</TabsTrigger>
-                <TabsTrigger value="stats" className="text-xs sm:text-sm py-2 px-2 sm:px-3">統計</TabsTrigger>
               </TabsList>
 
               {/* Surveys Tab */}
@@ -876,6 +871,12 @@ export default function ProfilePage() {
                         <p className="text-muted-foreground mb-4">
                           あなたの最初のアンケートを作成してみましょう
                         </p>
+                        {/* Debug info */}
+                        <div className="text-xs text-muted-foreground mb-4 bg-muted/20 p-2 rounded">
+                          <div>検索中のcreator_id: {user?.uid}</div>
+                          <div>ログインユーザー: {user?.email}</div>
+                          <div>Firebase UID: {user?.uid}</div>
+                        </div>
                         <Link href="/survey/create">
                           <Button>
                             <Plus className="w-4 h-4 mr-2" />
@@ -1180,7 +1181,33 @@ export default function ProfilePage() {
                       </CardContent>
                     </Card>
                   </div>
-                ) : (
+                ) : null}
+
+                {/* Ranking Section */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <TrendingUp className="w-5 h-5 text-primary" />
+                      <span>ランキング</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center space-y-4">
+                      <div className="text-4xl font-bold text-primary">#42</div>
+                      <p className="text-muted-foreground">
+                        全{(1250).toLocaleString()}人中 42位
+                      </p>
+                      <div className="flex justify-center space-x-4">
+                        <Button variant="outline" size="sm">
+                          <Trophy className="w-4 h-4 mr-2" />
+                          ランキングを見る
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {userSurveys.length === 0 && (
                   <Card>
                     <CardContent className="p-8 text-center">
                       <BarChart3 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -1287,87 +1314,6 @@ export default function ProfilePage() {
                 </Card>
               </TabsContent>
 
-              {/* Stats Tab */}
-              <TabsContent value="stats" className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
-                        <BarChart3 className="w-5 h-5 text-primary" />
-                        <span>回答統計</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">総回答数</span>
-                          <span className="font-semibold">{localProfile.surveys_answered}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">平均獲得ポイント</span>
-                          <span className="font-semibold">
-                            {Math.round(localProfile.points / localProfile.surveys_answered)}pt
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">連続回答記録</span>
-                          <span className="font-semibold">7日</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
-                        <Users className="w-5 h-5 text-primary" />
-                        <span>作成統計</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">作成したアンケート</span>
-                          <span className="font-semibold">{localProfile.surveys_created}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">総回答数</span>
-                          <span className="font-semibold">{localProfile.total_responses_received}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">平均回答数</span>
-                          <span className="font-semibold">
-                            {Math.round(localProfile.total_responses_received / localProfile.surveys_created)}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="md:col-span-2">
-                    <CardHeader>
-                      <CardTitle className="flex items-center space-x-2">
-                        <TrendingUp className="w-5 h-5 text-primary" />
-                        <span>ランキング</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center space-y-4">
-                        <div className="text-4xl font-bold text-primary">#42</div>
-                        <p className="text-muted-foreground">
-                          全{(1250).toLocaleString()}人中 42位
-                        </p>
-                        <div className="flex justify-center space-x-4">
-                          <Button variant="outline" size="sm">
-                            <Trophy className="w-4 h-4 mr-2" />
-                            ランキングを見る
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
             </Tabs>
           </div>
         </div>

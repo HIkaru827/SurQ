@@ -25,6 +25,7 @@ export interface Question {
   question: string
   options?: string[]
   required?: boolean
+  allowOther?: boolean
 }
 
 /**
