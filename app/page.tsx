@@ -234,9 +234,19 @@ export default function LandingPage() {
             </div>
             <span className="text-2xl font-bold text-foreground">SurQ</span>
           </div>
-          <p className="text-muted-foreground">
-            © 2024 SurQ. 知見を循環させるアンケートプラットフォーム
-          </p>
+          <div className="flex flex-col items-center space-y-4">
+            <div className="flex space-x-6">
+              <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
+                利用規約
+              </Link>
+              <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
+                プライバシーポリシー
+              </Link>
+            </div>
+            <p className="text-muted-foreground">
+              © 2024 SurQ. 知見を循環させるアンケートプラットフォーム
+            </p>
+          </div>
         </div>
       </footer>
     </div>
