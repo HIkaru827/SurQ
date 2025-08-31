@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -45,7 +45,8 @@ import {
   MoreHorizontal,
   Trash2,
   Gift,
-  Ticket
+  Ticket,
+  Save
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import {
@@ -227,6 +228,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('surveys')
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null)
   const [userSurveys, setUserSurveys] = useState<Survey[]>([])
+  const [draftSurveys, setDraftSurveys] = useState<Survey[]>([])
   const [answeredSurveys, setAnsweredSurveys] = useState<AnsweredSurvey[]>([])
   const [loading, setLoading] = useState(true)
   const [couponCode, setCouponCode] = useState('')
@@ -407,6 +409,7 @@ export default function ProfilePage() {
       // Firebase認証からユーザーUIDを取得
       if (!user?.uid) {
         setUserSurveys([])
+        setDraftSurveys([])
         return
       }
       
@@ -417,13 +420,20 @@ export default function ProfilePage() {
         console.log('Survey API Response:', data)
         console.log('Creator ID used:', user.uid)
         console.log('Surveys found:', data.surveys?.length || 0)
-        setUserSurveys(data.surveys || [])
+        
+        const allSurveys = data.surveys || []
+        const publishedSurveys = allSurveys.filter((survey: Survey) => survey.is_published)
+        const draftSurveysData = allSurveys.filter((survey: Survey) => !survey.is_published)
+        
+        setUserSurveys(publishedSurveys)
+        setDraftSurveys(draftSurveysData)
       } else {
         console.error('Survey API Error:', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Error fetching user surveys:', error)
       setUserSurveys([])
+      setDraftSurveys([])
     } finally {
       setLoading(false)
     }
@@ -849,8 +859,9 @@ export default function ProfilePage() {
           {/* Main Content */}
           <div className="lg:col-span-2">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 gap-1 sm:gap-0 h-auto sm:h-10 p-1">
-                <TabsTrigger value="surveys" className="text-xs sm:text-sm py-2 px-2 sm:px-3">作成</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-4 sm:grid-cols-6 gap-1 sm:gap-0 h-auto sm:h-10 p-1">
+                <TabsTrigger value="surveys" className="text-xs sm:text-sm py-2 px-2 sm:px-3">公開済み</TabsTrigger>
+                <TabsTrigger value="drafts" className="text-xs sm:text-sm py-2 px-2 sm:px-3">下書き</TabsTrigger>
                 <TabsTrigger value="answered" className="text-xs sm:text-sm py-2 px-2 sm:px-3">回答済み</TabsTrigger>
                 <TabsTrigger value="analytics" className="text-xs sm:text-sm py-2 px-2 sm:px-3">分析</TabsTrigger>
                 <TabsTrigger value="achievements" className="text-xs sm:text-sm py-2 px-2 sm:px-3">実績</TabsTrigger>
@@ -863,14 +874,14 @@ export default function ProfilePage() {
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <MessageSquare className="w-5 h-5 text-primary" />
-                      <span>作成したアンケート</span>
+                      <span>公開済みアンケート</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {userSurveys.length === 0 ? (
                       <div className="text-center py-8">
                         <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">まだアンケートを作成していません</h3>
+                        <h3 className="text-lg font-semibold mb-2">公開中のアンケートはありません</h3>
                         <p className="text-muted-foreground mb-4">
                           あなたの最初のアンケートを作成してみましょう
                         </p>
@@ -972,6 +983,119 @@ export default function ProfilePage() {
                                           <AlertDialogCancel>キャンセル</AlertDialogCancel>
                                           <AlertDialogAction 
                                             onClick={() => handleDeleteSurvey(survey.id, survey.response_count > 0)}
+                                            className="bg-destructive hover:bg-destructive/90"
+                                          >
+                                            削除する
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Draft Surveys Tab */}
+              <TabsContent value="drafts" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Save className="w-5 h-5 text-primary" />
+                      <span>下書きアンケート</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {draftSurveys.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Save className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">下書きはありません</h3>
+                        <p className="text-muted-foreground mb-4">
+                          アンケートを下書きとして保存すると、ここに表示されます
+                        </p>
+                        <Link href="/survey/create">
+                          <Button>
+                            <Plus className="w-4 h-4 mr-2" />
+                            アンケートを作成
+                          </Button>
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {draftSurveys.map((survey) => (
+                          <div key={survey.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <h3 className="font-semibold text-foreground">{survey.title}</h3>
+                                  <Badge variant="secondary">下書き</Badge>
+                                </div>
+                                {survey.description && (
+                                  <p className="text-muted-foreground mb-2 line-clamp-2">
+                                    {survey.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                                  <span className="flex items-center">
+                                    <MessageSquare className="w-4 h-4 mr-1" />
+                                    {survey.questions?.length || 0}問
+                                  </span>
+                                  <span>
+                                    作成日: {new Date(survey.created_at || '').toLocaleDateString('ja-JP')}
+                                  </span>
+                                  <span>
+                                    更新日: {new Date(survey.updated_at || '').toLocaleDateString('ja-JP')}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Button variant="outline" size="sm" asChild>
+                                  <Link href={`/survey/create?edit=${survey.id}`}>
+                                    <Edit className="w-4 h-4 mr-1" />
+                                    編集
+                                  </Link>
+                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/survey/create?edit=${survey.id}`}>
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        編集
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem 
+                                          onSelect={(e) => e.preventDefault()}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          削除
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>下書きを削除しますか？</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            この操作は取り消せません。下書き「{survey.title}」が完全に削除されます。
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                                          <AlertDialogAction 
+                                            onClick={() => handleDeleteSurvey(survey.id, false)}
                                             className="bg-destructive hover:bg-destructive/90"
                                           >
                                             削除する

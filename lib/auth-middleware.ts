@@ -124,8 +124,9 @@ export function createErrorResponse(message: string, status: number = 400): Next
  */
 export function validateOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin')
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000']
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001']
   
+  console.log('Origin validation:', { origin, allowedOrigins })
   return !origin || allowedOrigins.includes(origin)
 }
 

@@ -104,9 +104,11 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     }
 
     const body = await request.json()
+    console.log('Survey creation request body:', JSON.stringify(body, null, 2))
     
     // Validate input data
     const validatedData = validateInput(SurveySchema, body)
+    console.log('Validated data:', JSON.stringify(validatedData, null, 2))
     
     // ポイント計算
     const points = calculateSurveyPoints(validatedData.questions as Question[])
@@ -115,10 +117,10 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       title: validatedData.title,
       description: validatedData.description || null,
       creator_id: user.uid, // Use authenticated user's UID
-      questions: validatedData.questions,
+      questions: validatedData.questions || [],
       is_published: validatedData.is_published || false,
-      respondent_points: validatedData.respondent_points,
-      creator_points: validatedData.creator_points,
+      respondent_points: validatedData.respondent_points || points.respondentPoints,
+      creator_points: validatedData.creator_points || points.creatorPoints,
       response_count: 0,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
@@ -137,11 +139,11 @@ export const POST = withAuth(async (request: NextRequest, user) => {
           const currentPoints = userDoc.data().points || 0
           
           // Validate sufficient points
-          validateSufficientPoints(currentPoints, validatedData.creator_points)
+          validateSufficientPoints(currentPoints, surveyData.creator_points)
           
           // ポイント消費
           await updateDoc(doc(db, 'users', userDoc.id), {
-            points: currentPoints - validatedData.creator_points,
+            points: currentPoints - surveyData.creator_points,
             updated_at: serverTimestamp()
           })
         }

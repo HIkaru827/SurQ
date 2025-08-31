@@ -35,7 +35,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:3000'
+            value: process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:3001'
           },
           {
             key: 'Access-Control-Allow-Methods',

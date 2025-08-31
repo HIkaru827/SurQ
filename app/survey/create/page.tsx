@@ -111,6 +111,7 @@ function CreateSurveyPageInner() {
   const [showPreview, setShowPreview] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [originalSurvey, setOriginalSurvey] = useState<any>(null)
 
@@ -156,6 +157,52 @@ function CreateSurveyPageInner() {
   }
 
   // アンケート公開処理
+  const handleSaveDraft = async () => {
+    // バリデーション（下書きの場合は緩い条件）
+    if (!survey.title.trim()) {
+      alert('アンケートタイトルを入力してください')
+      return
+    }
+
+    const creatorId = user?.uid || 'anonymous-user'
+
+    setIsSavingDraft(true)
+    try {
+      const url = editSurveyId ? `/api/surveys/${editSurveyId}` : '/api/surveys'
+      const method = editSurveyId ? 'PUT' : 'POST'
+      
+      const response = await authenticatedFetch(url, {
+        method: method,
+        body: JSON.stringify({
+          ...survey,
+          creator_id: creatorId,
+          creator_email: user?.email,
+          is_published: false, // 下書きとして保存
+          respondent_points: pointCalculation.respondentPoints,
+          creator_points: pointCalculation.creatorPoints
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        alert('下書きとして保存しました')
+        
+        // 新規作成の場合は編集モードに切り替え
+        if (!editSurveyId && data.survey?.id) {
+          window.location.href = `/survey/create?edit=${data.survey.id}`
+        }
+      } else {
+        const error = await response.json()
+        alert(`保存に失敗しました: ${error.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error saving draft:', error)
+      alert('下書きの保存中にエラーが発生しました')
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }
+
   const handlePublish = async () => {
     // バリデーション
     if (!survey.title.trim()) {
@@ -203,7 +250,9 @@ function CreateSurveyPageInner() {
           ...survey,
           creator_id: creatorId,
           creator_email: user?.email,
-          is_published: true
+          is_published: true,
+          respondent_points: pointCalculation.respondentPoints,
+          creator_points: pointCalculation.creatorPoints
         })
       })
 
@@ -223,50 +272,6 @@ function CreateSurveyPageInner() {
       alert('アンケートの公開に失敗しました。もう一度お試しください。')
     } finally {
       setIsPublishing(false)
-    }
-  }
-
-  // 下書き保存処理
-  const handleSaveDraft = async () => {
-    if (!survey.title.trim()) {
-      alert('アンケートタイトルを入力してください')
-      return
-    }
-
-    // 現在のユーザー情報を取得（Firebase認証から）
-    const creatorId = user?.uid || 'anonymous-user'
-
-    setIsSaving(true)
-    try {
-      const url = editSurveyId ? `/api/surveys/${editSurveyId}` : '/api/surveys'
-      const method = editSurveyId ? 'PUT' : 'POST'
-      
-      const response = await authenticatedFetch(url, {
-        method: method,
-        body: JSON.stringify({
-          ...survey,
-          creator_id: creatorId,
-          creator_email: user?.email,
-          is_published: false
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('下書きの保存に失敗しました')
-      }
-
-      const result = await response.json()
-      const action = editSurveyId ? '更新' : '保存'
-      alert(`下書きが${action}されました！`)
-      
-      // 保存後はアプリページに戻る
-      window.location.href = '/app'
-      
-    } catch (error) {
-      console.error('Error saving draft:', error)
-      alert('下書きの保存に失敗しました。もう一度お試しください。')
-    } finally {
-      setIsSaving(false)
     }
   }
 
@@ -484,6 +489,22 @@ function CreateSurveyPageInner() {
               <Button variant="outline" size="sm" onClick={() => setShowPreview(true)} className="p-2 sm:px-3">
                 <Eye className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline text-sm">プレビュー</span>
+              </Button>
+              <Button 
+                variant="outline"
+                size="sm" 
+                onClick={handleSaveDraft}
+                disabled={isSavingDraft || !survey.title.trim()}
+                className="p-2 sm:px-3"
+              >
+                {isSavingDraft ? (
+                  <span className="text-sm">保存中...</span>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline text-sm">下書き保存</span>
+                  </>
+                )}
               </Button>
               <Button 
                 size="sm" 

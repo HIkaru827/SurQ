@@ -15,21 +15,36 @@ export const QuestionSchema = z.object({
   }),
   question: z.string().min(1, '質問文は必須です').max(500, '質問文は500文字以内で入力してください'),
   options: z.array(z.string()).optional(),
-  required: z.boolean().default(true)
+  required: z.boolean().default(true),
+  allowOther: z.boolean().optional().default(false),
+  allowMultiple: z.boolean().optional().default(false)
 })
 
 // Survey validation schema
 export const SurveySchema = z.object({
   title: z.string().min(1, 'タイトルは必須です').max(200, 'タイトルは200文字以内で入力してください'),
   description: z.string().max(1000, '説明は1000文字以内で入力してください').optional().nullable(),
-  questions: z.array(QuestionSchema).min(1, '質問は少なくとも1つ必要です').max(50, '質問は50個以内で作成してください'),
-  respondent_points: z.number().int().min(1, '回答者ポイントは1以上である必要があります').max(1000, '回答者ポイントは1000以下である必要があります'),
-  creator_points: z.number().int().min(0),
+  questions: z.array(QuestionSchema).max(50, '質問は50個以内で作成してください'),
+  respondent_points: z.number().min(0).max(1000, '回答者ポイントは1000以下である必要があります').optional().default(0),
+  creator_points: z.number().min(0).optional().default(0),
   is_published: z.boolean().optional().default(false)
+}).refine((data) => {
+  // 公開時は質問が必須、下書き時は不要
+  return !data.is_published || data.questions.length > 0
+}, {
+  message: '公開するには質問が少なくとも1つ必要です',
+  path: ['questions']
 })
 
 // Survey update schema (for partial updates)
-export const SurveyUpdateSchema = SurveySchema.partial()
+export const SurveyUpdateSchema = z.object({
+  title: z.string().min(1, 'タイトルは必須です').max(200, 'タイトルは200文字以内で入力してください').optional(),
+  description: z.string().max(1000, '説明は1000文字以内で入力してください').optional().nullable(),
+  questions: z.array(QuestionSchema).max(50, '質問は50個以内で作成してください').optional(),
+  respondent_points: z.number().min(0).max(1000, '回答者ポイントは1000以下である必要があります').optional(),
+  creator_points: z.number().min(0).optional(),
+  is_published: z.boolean().optional()
+})
 
 // Response validation schema
 export const ResponseSchema = z.object({
