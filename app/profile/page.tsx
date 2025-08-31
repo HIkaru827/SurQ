@@ -75,6 +75,7 @@ interface Survey {
   respondent_points: number
   creator_points: number
   created_at: string
+  updated_at: string
 }
 
 interface UserProfile {
