@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PWA Icon Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        canvas { border: 1px solid #ccc; margin: 10px; display: block; }
+        .icon-preview { display: inline-block; margin: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>PWA Icon Generator for SurQ</h1>
+    <p>Click the button to generate and download PWA icons:</p>
+    
+    <div class="icon-preview">
+        <h3>192x192</h3>
+        <canvas id="icon192" width="192" height="192"></canvas>
+    </div>
+    
+    <div class="icon-preview">
+        <h3>512x512</h3>
+        <canvas id="icon512" width="512" height="512"></canvas>
+    </div>
+    
+    <br>
+    <button onclick="generateIcons()" style="padding: 10px 20px; font-size: 16px;">Generate & Download Icons</button>
+    
+    <script>
+        function drawIcon(canvas) {
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, size, size);
+            
+            // Draw blue background with rounded corners
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Draw letter "S" in white
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.floor(size * 0.6)}px Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('S', size/2, size/2);
+        }
+        
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function generateIcons() {
+            const canvas192 = document.getElementById('icon192');
+            const canvas512 = document.getElementById('icon512');
+            
+            drawIcon(canvas192);
+            drawIcon(canvas512);
+            
+            // Small delay to ensure canvas is fully rendered
+            setTimeout(() => {
+                downloadCanvas(canvas192, 'icon-192x192.png');
+                setTimeout(() => {
+                    downloadCanvas(canvas512, 'icon-512x512.png');
+                }, 100);
+            }, 100);
+            
+            alert('Icons downloaded! Please move them to the public folder.');
+        }
+        
+        // Initialize preview
+        window.onload = function() {
+            drawIcon(document.getElementById('icon192'));
+            drawIcon(document.getElementById('icon512'));
+        }
+    </script>
+</body>
+</html>

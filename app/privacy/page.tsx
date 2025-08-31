@@ -9,7 +9,7 @@ export default function PrivacyPage() {
         <div className="bg-white rounded-lg shadow-lg p-8">
           <section className="mb-8">
             <p className="text-gray-700 leading-relaxed mb-6">
-              SurQ（以下「本サービス」）は、ユーザーの個人情報の保護に最大限の注意を払います。本プライバシーポリシーは、当サービスにおける個人情報の取り扱いについて定めたものです。
+              SurQ（以下「本アプリ」）は、ユーザーの個人情報の保護に最大限の注意を払います。本プライバシーポリシーは、当サービスにおける個人情報の取り扱いについて定めたものです。
             </p>
           </section>
 

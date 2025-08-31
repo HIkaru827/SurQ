@@ -9,6 +9,33 @@ export const metadata: Metadata = {
   title: 'SurQ - Survey Platform',
   description: 'Create and manage surveys with Firebase',
   generator: 'Next.js',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'SurQ',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-title': 'SurQ',
+    'msapplication-TileColor': '#3b82f6',
+    'msapplication-tap-highlight': 'no',
+  },
+}
+
+export function generateViewport() {
+  return {
+    themeColor: '#3b82f6',
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  }
 }
 
 export default function RootLayout({
