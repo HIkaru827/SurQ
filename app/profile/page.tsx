@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import { surveyEvents } from '@/lib/analytics'
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { Progress } from "@/components/ui/progress"
@@ -283,6 +284,7 @@ export default function ProfilePage() {
 
       if (response.ok && data.success) {
         // 成功時の処理
+        surveyEvents.earnPoints(data.pointsAdded, 'coupon_redemption')
         toast.success(`${data.pointsAdded}ポイントが追加されました！`)
         setCouponCode('')
         

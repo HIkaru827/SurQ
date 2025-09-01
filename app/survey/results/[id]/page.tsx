@@ -1,11 +1,13 @@
 "use client"
 
+import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Users, TrendingUp } from "lucide-react"
 import Link from "next/link"
+import { surveyEvents } from "@/lib/analytics"
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
 // Mock results data
@@ -50,6 +52,10 @@ const mockResults = {
 export default async function SurveyResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const results = mockResults
+  
+  useEffect(() => {
+    surveyEvents.viewResults(id)
+  }, [id])
 
   return (
     <div className="min-h-screen bg-background">

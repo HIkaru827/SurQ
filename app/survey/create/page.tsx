@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth"
 import { isDeveloperAccount } from "@/lib/developer"
 import { authenticatedFetch } from "@/lib/api-client"
+import { surveyEvents } from "@/lib/analytics"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -185,6 +186,8 @@ function CreateSurveyPageInner() {
 
       if (response.ok) {
         const data = await response.json()
+        const surveyId = data.survey?.id || 'unknown'
+        surveyEvents.saveDraft(surveyId)
         alert('下書きとして保存しました')
         
         // 新規作成の場合は編集モードに切り替え
@@ -261,6 +264,12 @@ function CreateSurveyPageInner() {
       }
 
       const result = await response.json()
+      const surveyId = result.survey?.id || editSurveyId || 'unknown'
+      const questionTypes = survey.questions.map(q => q.type)
+      const surveyType = questionTypes.length > 3 ? 'complex' : 'simple'
+      
+      surveyEvents.createSurvey(surveyId, surveyType)
+      surveyEvents.publishSurvey(surveyId)
       
       alert('アンケートが公開されました！')
       

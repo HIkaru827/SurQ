@@ -3,6 +3,8 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { AuthProvider } from '@/lib/auth'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics'
+import { PrivacyNotice } from '@/components/analytics/PrivacyNotice'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -95,11 +97,13 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="ja">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+        <GoogleAnalytics />
         <ErrorBoundary>
           <AuthProvider>
             {children}
+            <PrivacyNotice />
           </AuthProvider>
         </ErrorBoundary>
       </body>

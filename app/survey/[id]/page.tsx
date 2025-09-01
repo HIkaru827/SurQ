@@ -14,6 +14,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { toast } from "sonner"
+import { surveyEvents } from "@/lib/analytics"
 
 // Mock survey data
 const mockSurvey = {
@@ -65,6 +66,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   const [error, setError] = useState<string | null>(null)
   const [surveyId, setSurveyId] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
+  const [responseStartTime, setResponseStartTime] = useState<number>(Date.now())
   const [hasAlreadyAnswered, setHasAlreadyAnswered] = useState(false)
   const [respondentName, setRespondentName] = useState('')
   const [respondentEmail, setRespondentEmail] = useState('')
@@ -292,6 +294,10 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       console.log('Survey submission response:', data)
 
       if (response.ok && data.success) {
+        const responseTime = Date.now() - responseStartTime
+        surveyEvents.submitResponse(surveyId, responseTime)
+        surveyEvents.earnPoints(data.points_earned, 'survey_response')
+        
         setIsCompleted(true)
         setTimeout(() => setShowCompletion(true), 500)
         toast.success(`アンケートを送信しました！${data.points_earned}ポイント獲得！`)
