@@ -7,7 +7,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: {
-    default: 'SurQ - 知見を循環させるアンケートプラットフォーム',
+    default: 'SurQ - 無料で使えるアンケートプラットフォーム',
     template: '%s | SurQ'
   },
   description: '答えてポイント獲得、作って知見共有。SurQは質問者と回答者が価値を交換する革新的なアンケートプラットフォームです。無料登録で今すぐ始めよう。',
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'ja_JP',
     url: 'https://surq.net',
-    title: 'SurQ - 知見を循環させるアンケートプラットフォーム',
+    title: 'SurQ - 無料で使えるアンケートプラットフォーム',
     description: '答えてポイント獲得、作って知見共有。革新的な循環型アンケートシステム',
     siteName: 'SurQ',
     images: [
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'SurQ - 知見を循環させるアンケートプラットフォーム',
+    title: 'SurQ - 無料で使えるアンケートプラットフォーム',
     description: '答えてポイント獲得、作って知見共有。革新的な循環型アンケートシステム',
     images: ['https://surq.net/surq_logo.png'],
     creator: '@SurQ_platform',

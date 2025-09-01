@@ -28,7 +28,7 @@ export default function LandingPage() {
 
             {/* Main Heading */}
             <h2 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 leading-tight">
-              知見を循環させる
+              無料で使える
               <br />
               <span className="text-primary">アンケートプラットフォーム</span>
             </h2>
@@ -145,7 +145,7 @@ export default function LandingPage() {
                 <CardTitle className="text-2xl mb-4">コミュニティ</CardTitle>
                 <CardDescription className="text-lg leading-relaxed">
                   質問者と回答者がお互いに価値を提供し、
-                  知見を共有するコミュニティを形成
+                  無料で使えるアンケートプラットフォーム
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -256,7 +256,7 @@ export default function LandingPage() {
               </Link>
             </div>
             <p className="text-muted-foreground">
-              © 2025 SurQ. 知見を循環させるアンケートプラットフォーム
+              © 2025 SurQ. 無料で使えるアンケートプラットフォーム
             </p>
           </div>
         </div>

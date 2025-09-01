@@ -1,7 +1,7 @@
 {
   "name": "SurQ - Survey Platform",
   "short_name": "SurQ",
-  "description": "知見を循環させるアンケートプラットフォーム",
+  "description": "無料で使えるアンケートプラットフォーム",
   "start_url": "https://surq.net/",
   "scope": "https://surq.net/",
   "display": "standalone",

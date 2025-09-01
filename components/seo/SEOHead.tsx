@@ -11,9 +11,9 @@ interface SEOHeadProps {
 }
 
 export const SEOHead: FC<SEOHeadProps> = ({
-  title = 'SurQ - 知見を循環させるアンケートプラットフォーム',
+  title = 'SurQ - 無料で使えるアンケートプラットフォーム',
   description = '答えてポイント獲得、作って知見共有。SurQは質問者と回答者が価値を交換する革新的なアンケートプラットフォームです。',
-  keywords = ['アンケート', 'survey', '調査', 'questionnaire', 'ポイント', 'フィードバック', 'マーケティング', 'リサーチ', '循環型', '知見共有'],
+  keywords = ['アンケート', 'survey', '調査', 'questionnaire', 'ポイント', 'フィードバック', 'マーケティング', 'リサーチ', '循環型', '知見共有', 'SurQ',' 無料 ',' 卒論 ',' 学生 ',' 市場調査'],
   ogImage = 'https://surq.net/surq_logo.png',
   canonicalUrl,
   noindex = false,

@@ -18,7 +18,7 @@ export const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
   "name": "SurQ",
-  "description": "知見を循環させるアンケートプラットフォーム",
+  "description": "無料で使えるアンケートプラットフォーム",
   "url": "https://surq.net",
   "logo": "https://surq.net/surq_logo.png",
   "sameAs": [
@@ -64,7 +64,7 @@ export const faqSchema = {
       "name": "SurQとは何ですか？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "SurQは知見を循環させるアンケートプラットフォームです。アンケートに答えてポイントを獲得し、そのポイントで自分のアンケートを作成・配布できます。"
+        "text": "SurQは無料で使えるアンケートプラットフォームです。アンケートに答えてポイントを獲得し、そのポイントで自分のアンケートを作成・配布できます。"
       }
     },
     {
