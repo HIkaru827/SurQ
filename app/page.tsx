@@ -2,10 +2,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowRight, MessageSquare, Users, Trophy, BarChart3, Zap, Star, RefreshCw } from "lucide-react"
 import Link from "next/link"
+import { StructuredData, organizationSchema, webApplicationSchema, faqSchema } from "@/components/seo/StructuredData"
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      {/* 構造化データ */}
+      <StructuredData data={organizationSchema} />
+      <StructuredData data={webApplicationSchema} />
+      <StructuredData data={faqSchema} />
+      
+      <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5" />
@@ -28,9 +35,11 @@ export default function LandingPage() {
 
             {/* Description */}
             <p className="text-xl md:text-2xl text-muted-foreground mb-12 leading-relaxed max-w-3xl mx-auto">
-              SurQは、質問者と回答者がお互いに価値を提供し合う循環型システムです。
+              <strong>SurQ</strong>は、質問者と回答者がお互いに価値を提供し合う<em>革新的な循環型アンケートシステム</em>です。
               <br />
-              アンケートに答えてポイントを獲得し、そのポイントで自分のアンケートを作成・配布できます。
+              アンケートに答えて<strong>ポイントを獲得</strong>し、そのポイントで自分のアンケートを作成・配布できます。
+              <br />
+              <span className="text-primary font-semibold">完全無料</span>で今すぐ始められます。
             </p>
 
             {/* CTA Button */}
@@ -252,6 +261,7 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </>
   )
 }
