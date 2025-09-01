@@ -10,6 +10,18 @@ export const metadata: Metadata = {
   description: 'Create and manage surveys with Firebase',
   generator: 'Next.js',
   manifest: '/manifest.json',
+  metadataBase: new URL('https://surq.net'),
+  alternates: {
+    canonical: 'https://surq.net',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

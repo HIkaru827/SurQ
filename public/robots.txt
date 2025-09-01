@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /signup
+Allow: /privacy
+Allow: /terms
+Allow: /sitemap
+
+# APIエンドポイントをクロール対象外に
+Disallow: /api/
+Disallow: /survey/*/responses
+Disallow: /profile
+Disallow: /dashboard
+
+# サイトマップの場所
+Sitemap: https://surq.net/sitemap.xml
+
+# クロール間隔（推奨）
+Crawl-delay: 1

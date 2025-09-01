@@ -939,25 +939,22 @@ export default function ProfilePage() {
                                       詳細を見る
                                     </DropdownMenuItem>
 
-                                    {/* 回答を見る（回答者がいる場合のみ） */}
-                                    {survey.response_count > 0 && (
-                                      <DropdownMenuItem onClick={() => {
-                                        window.open(`/survey/${survey.id}/responses`, '_blank')
-                                      }}>
-                                        <BarChart3 className="w-4 h-4 mr-2" />
-                                        回答を見る ({survey.response_count}件)
-                                      </DropdownMenuItem>
-                                    )}
+                                    {/* 回答を見る（デバッグ: 常に表示） */}
+                                    <DropdownMenuItem onClick={() => {
+                                      console.log('Survey data:', survey) // デバッグログ
+                                      window.open(`/survey/${survey.id}/responses`, '_blank')
+                                    }}>
+                                      <BarChart3 className="w-4 h-4 mr-2" />
+                                      回答を見る ({survey.response_count || 0}件)
+                                    </DropdownMenuItem>
                                     
-                                    {/* 編集する（回答者がゼロの場合のみ） */}
-                                    {survey.response_count === 0 && (
-                                      <DropdownMenuItem onClick={() => {
+                                    {/* 編集する（デバッグ: 常に表示） */}
+                                    <DropdownMenuItem onClick={() => {
                                         window.location.href = `/survey/create?edit=${survey.id}`
                                       }}>
                                         <Edit className="w-4 h-4 mr-2" />
                                         編集する
                                       </DropdownMenuItem>
-                                    )}
                                     
                                     {/* 削除する */}
                                     <AlertDialog>

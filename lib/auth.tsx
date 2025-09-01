@@ -104,6 +104,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setUserProfile(data.user)
             // プロフィールをキャッシュ（5分間）
             sessionStorage.setItem(`profile_${firebaseUser.uid}`, JSON.stringify(data.user))
+          } else if (response.status === 404) {
+            // ユーザーが存在しない場合、自動的に作成
+            console.log('User not found in Firestore, creating new user record...')
+            try {
+              const createResponse = await fetch('/api/users', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  email: firebaseUser.email,
+                  name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User'
+                })
+              })
+              
+              if (createResponse.ok) {
+                const createData = await createResponse.json()
+                setUserProfile(createData.user)
+                sessionStorage.setItem(`profile_${firebaseUser.uid}`, JSON.stringify(createData.user))
+                console.log('User record created successfully')
+              } else {
+                console.error('Failed to create user record:', await createResponse.text())
+                setUserProfile(null)
+              }
+            } catch (createError) {
+              console.error('Error creating user record:', createError)
+              setUserProfile(null)
+            }
           } else {
             setUserProfile(null)
           }

@@ -2,6 +2,11 @@ import withPWA from 'next-pwa'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Static export configuration disabled to support API routes
+  // output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
+  // basePath: process.env.NODE_ENV === 'production' ? '' : undefined,
+  // assetPrefix: process.env.NODE_ENV === 'production' ? 'https://surq.net' : undefined,
+  
   // Security headers
   async headers() {
     return [
@@ -35,7 +40,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:3001'
+            value: process.env.NODE_ENV === 'production' ? 'https://surq.net' : 'http://localhost:3001'
           },
           {
             key: 'Access-Control-Allow-Methods',

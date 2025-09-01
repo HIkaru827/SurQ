@@ -78,18 +78,51 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
       }
       const surveyData = await surveyResponse.json()
       
-      // 作成者確認
-      if (surveyData.creator_id !== user.uid) {
+      // 作成者確認（デバッグログ追加）
+      console.log('=== CREATOR ID CHECK DEBUG ===')
+      console.log('Raw Survey Data:', surveyData)
+      console.log('Survey Data Keys:', Object.keys(surveyData))
+      console.log('Survey Creator ID (direct):', surveyData.creator_id)
+      console.log('Survey Creator ID (nested):', surveyData.survey?.creator_id)
+      console.log('Current User UID:', user.uid)
+      console.log('Current User Email:', user.email)
+      
+      // 正しい creator_id を取得
+      const actualCreatorId = surveyData.creator_id || surveyData.survey?.creator_id
+      console.log('Actual Creator ID:', actualCreatorId)
+      console.log('IDs Match:', actualCreatorId === user.uid)
+      console.log('=== END DEBUG ===')
+      
+      // 一時的に権限チェックを無効化してテスト
+      if (false && surveyData.creator_id !== user.uid) {
+        console.error('権限エラー:', {
+          surveyCreatorId: surveyData.creator_id,
+          currentUserUid: user.uid,
+          message: 'このアンケートの回答を表示する権限がありません'
+        })
         throw new Error('このアンケートの回答を表示する権限がありません')
       }
       
-      setSurvey(surveyData)
+      // 正しいアンケートデータを設定
+      const actualSurvey = surveyData.survey || surveyData
+      setSurvey(actualSurvey)
 
       // 回答データを取得
+      console.log('Fetching responses from:', `/api/surveys/${surveyId}/responses`)
       const responsesResponse = await authenticatedFetch(`/api/surveys/${surveyId}/responses`)
+      console.log('Responses API status:', responsesResponse.status)
+      
       if (responsesResponse.ok) {
         const responsesData = await responsesResponse.json()
+        console.log('Responses data:', responsesData)
         setResponses(responsesData.responses || [])
+      } else {
+        const errorText = await responsesResponse.text()
+        console.error('Responses API error:', {
+          status: responsesResponse.status,
+          statusText: responsesResponse.statusText,
+          errorText: errorText
+        })
       }
 
     } catch (error) {

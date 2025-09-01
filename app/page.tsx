@@ -235,12 +235,15 @@ export default function LandingPage() {
             <span className="text-2xl font-bold text-foreground">SurQ</span>
           </div>
           <div className="flex flex-col items-center space-y-4">
-            <div className="flex space-x-6">
+            <div className="flex flex-wrap justify-center space-x-6">
               <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
                 利用規約
               </Link>
               <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
                 プライバシーポリシー
+              </Link>
+              <Link href="/sitemap" className="text-muted-foreground hover:text-foreground transition-colors">
+                サイトマップ
               </Link>
             </div>
             <p className="text-muted-foreground">
