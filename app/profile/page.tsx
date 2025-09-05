@@ -15,10 +15,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { surveyEvents } from '@/lib/analytics'
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
+import { PushNotificationSetup } from "@/components/notifications/PushNotificationSetup"
 import { Progress } from "@/components/ui/progress"
 import { 
   User, 
@@ -48,7 +50,9 @@ import {
   Trash2,
   Gift,
   Ticket,
-  Save
+  Save,
+  Send,
+  Shield
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import {
@@ -238,8 +242,12 @@ export default function ProfilePage() {
   const [couponHistory, setCouponHistory] = useState<any[]>([])
   const [couponLoading, setCouponLoading] = useState(false)
   const [showCouponDialog, setShowCouponDialog] = useState(false)
+  const [notificationTitle, setNotificationTitle] = useState("")
+  const [notificationContent, setNotificationContent] = useState("")
+  const [isNotificationSending, setIsNotificationSending] = useState(false)
   
   const isDevAccount = user?.email ? isDeveloperAccount(user.email) : false
+  const isAdmin = user?.email === 'hikarujin167@gmail.com'
 
   const fetchCouponHistory = async () => {
     if (!user?.email) return
@@ -256,6 +264,37 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error fetching coupon history:', error)
       setCouponHistory([])
+    }
+  }
+
+  const handleSendNotification = async () => {
+    if (!notificationTitle.trim() || !notificationContent.trim()) {
+      toast.error("通知のタイトルと内容を入力してください")
+      return
+    }
+    
+    setIsNotificationSending(true)
+    try {
+      const response = await authenticatedFetch('/api/admin/notifications/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: notificationTitle,
+          content: notificationContent
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('通知の送信に失敗しました')
+      }
+      
+      toast.success("全ユーザーに通知を送信しました")
+      setNotificationTitle("")
+      setNotificationContent("")
+    } catch (error) {
+      console.error('Error sending notification:', error)
+      toast.error("通知の送信に失敗しました")
+    } finally {
+      setIsNotificationSending(false)
     }
   }
 
@@ -859,18 +898,62 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Admin Notification Panel */}
+            {isAdmin && (
+              <Card className="border-orange-200 bg-orange-50/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-orange-800">
+                    <Shield className="w-5 h-5" />
+                    <span>管理者機能 - 全体通知</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="notification-title">通知タイトル</Label>
+                    <Input
+                      id="notification-title"
+                      value={notificationTitle}
+                      onChange={(e) => setNotificationTitle(e.target.value)}
+                      placeholder="例: システムメンテナンスのお知らせ"
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="notification-content">通知内容</Label>
+                    <Textarea
+                      id="notification-content"
+                      value={notificationContent}
+                      onChange={(e) => setNotificationContent(e.target.value)}
+                      placeholder="例: 明日の午前2時〜4時の間、システムメンテナンスを実施いたします。"
+                      rows={4}
+                      className="bg-white"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleSendNotification}
+                    disabled={isNotificationSending || !notificationTitle.trim() || !notificationContent.trim()}
+                    className="w-full bg-orange-600 hover:bg-orange-700"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {isNotificationSending ? "送信中..." : "全ユーザーに通知を送信"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Main Content */}
           <div className="lg:col-span-2">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4 sm:grid-cols-6 gap-1 sm:gap-0 h-auto sm:h-10 p-1">
+              <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 gap-1 sm:gap-0 h-auto sm:h-10 p-1">
                 <TabsTrigger value="surveys" className="text-xs sm:text-sm py-2 px-2 sm:px-3">公開済み</TabsTrigger>
                 <TabsTrigger value="drafts" className="text-xs sm:text-sm py-2 px-2 sm:px-3">下書き</TabsTrigger>
                 <TabsTrigger value="answered" className="text-xs sm:text-sm py-2 px-2 sm:px-3">回答済み</TabsTrigger>
                 <TabsTrigger value="analytics" className="text-xs sm:text-sm py-2 px-2 sm:px-3">分析</TabsTrigger>
                 <TabsTrigger value="achievements" className="text-xs sm:text-sm py-2 px-2 sm:px-3">実績</TabsTrigger>
                 <TabsTrigger value="activity" className="text-xs sm:text-sm py-2 px-2 sm:px-3">活動</TabsTrigger>
+                <TabsTrigger value="settings" className="text-xs sm:text-sm py-2 px-2 sm:px-3">設定</TabsTrigger>
               </TabsList>
 
               {/* Surveys Tab */}
@@ -1442,6 +1525,61 @@ export default function ProfilePage() {
                           <Badge variant="secondary">+{activity.points}pt</Badge>
                         </div>
                       ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Settings Tab */}
+              <TabsContent value="settings" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Settings className="w-5 h-5 text-primary" />
+                      <span>アカウント設定</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Push Notification Settings */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground mb-4">通知設定</h3>
+                      <PushNotificationSetup />
+                    </div>
+
+                    {/* Other Settings */}
+                    <div className="border-t pt-6">
+                      <h3 className="text-lg font-semibold text-foreground mb-4">その他の設定</h3>
+                      <div className="space-y-3">
+                        <Button variant="outline" className="w-full justify-start">
+                          <User className="w-4 h-4 mr-2" />
+                          プロフィール編集
+                        </Button>
+                        <Button variant="outline" className="w-full justify-start">
+                          <Eye className="w-4 h-4 mr-2" />
+                          プライバシー設定
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start"
+                          onClick={() => setShowCouponDialog(true)}
+                        >
+                          <Gift className="w-4 h-4 mr-2" />
+                          クーポンコード入力
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Danger Zone */}
+                    <div className="border-t pt-6">
+                      <h3 className="text-lg font-semibold text-red-600 mb-4">危険な操作</h3>
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-start border-red-200 text-red-600 hover:bg-red-50"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        ログアウト
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

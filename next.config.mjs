@@ -103,9 +103,9 @@ const nextConfig = {
 
 export default withPWA({
   dest: 'public',
-  register: false,
-  skipWaiting: false,
-  disable: true, // Always disable PWA for now
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development', // Enable PWA in production
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
