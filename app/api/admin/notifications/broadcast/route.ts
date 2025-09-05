@@ -145,9 +145,9 @@ async function sendPushNotifications(title: string, content: string): Promise<{s
 
     // Send push notifications to all subscribers
     const pushPromises = subscriptionsSnapshot.docs.map(async (subscriptionDoc) => {
+      const subscriptionData = subscriptionDoc.data()
+      
       try {
-        const subscriptionData = subscriptionDoc.data()
-        
         const pushSubscription = {
           endpoint: subscriptionData.endpoint,
           keys: {
