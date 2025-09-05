@@ -1,11 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import {
   ArrowLeft,
   BarChart3,
@@ -18,8 +21,13 @@ import {
   RefreshCw,
   Calendar,
   Target,
+  Send,
+  Shield,
 } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/lib/auth"
+import { authenticatedFetch } from "@/lib/api-client"
+import { toast } from "sonner"
 import {
   AreaChart,
   Area,
@@ -109,6 +117,44 @@ const mockDashboard = {
 export default function DashboardPage() {
   const [timeRange, setTimeRange] = useState("7d")
   const [selectedSurvey, setSelectedSurvey] = useState("all")
+  const { user } = useAuth()
+  const [notificationTitle, setNotificationTitle] = useState("")
+  const [notificationContent, setNotificationContent] = useState("")
+  const [isNotificationSending, setIsNotificationSending] = useState(false)
+  
+  // Check if user is admin
+  const isAdmin = user?.email === 'hikarujin167@gmail.com'
+  
+  const handleSendNotification = async () => {
+    if (!notificationTitle.trim() || !notificationContent.trim()) {
+      toast.error("通知のタイトルと内容を入力してください")
+      return
+    }
+    
+    setIsNotificationSending(true)
+    try {
+      const response = await authenticatedFetch('/api/admin/notifications/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: notificationTitle,
+          content: notificationContent
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('通知の送信に失敗しました')
+      }
+      
+      toast.success("全ユーザーに通知を送信しました")
+      setNotificationTitle("")
+      setNotificationContent("")
+    } catch (error) {
+      console.error('Error sending notification:', error)
+      toast.error("通知の送信に失敗しました")
+    } finally {
+      setIsNotificationSending(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -401,6 +447,49 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Admin Notification Panel */}
+            {isAdmin && (
+              <Card className="border-orange-200 bg-orange-50/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2 text-orange-800">
+                    <Shield className="w-5 h-5" />
+                    <span>管理者機能 - 全体通知</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="notification-title">通知タイトル</Label>
+                    <Input
+                      id="notification-title"
+                      value={notificationTitle}
+                      onChange={(e) => setNotificationTitle(e.target.value)}
+                      placeholder="例: システムメンテナンスのお知らせ"
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="notification-content">通知内容</Label>
+                    <Textarea
+                      id="notification-content"
+                      value={notificationContent}
+                      onChange={(e) => setNotificationContent(e.target.value)}
+                      placeholder="例: 明日の午前2時〜4時の間、システムメンテナンスを実施いたします。"
+                      rows={4}
+                      className="bg-white"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleSendNotification}
+                    disabled={isNotificationSending || !notificationTitle.trim() || !notificationContent.trim()}
+                    className="w-full bg-orange-600 hover:bg-orange-700"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {isNotificationSending ? "送信中..." : "全ユーザーに通知を送信"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Quick Actions */}
             <Card>

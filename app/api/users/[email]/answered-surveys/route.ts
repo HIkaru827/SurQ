@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, collection, getDocs, query, where } from "firebase/firestore"
+import { withAuth, createErrorResponse, authenticateUser } from "@/lib/auth-middleware"
 
 // Firebase client config for server-side usage
 const firebaseConfig = {
@@ -22,19 +23,26 @@ if (!getApps().length) {
 
 const db = getFirestore(app)
 
-export async function GET(
+export const GET = withAuth(async (
   request: NextRequest,
+  user,
   { params }: { params: Promise<{ email: string }> }
-) {
+) => {
   try {
     const { email } = await params
     const decodedEmail = decodeURIComponent(email)
 
     if (!decodedEmail) {
-      return NextResponse.json({ 
-        error: "メールアドレスが必要です" 
-      }, { status: 400 })
+      return createErrorResponse("メールアドレスが必要です", 400)
     }
+
+    // ユーザーは自分のデータのみアクセス可能（管理者は除く）
+    const isAdmin = user.email === 'hikarujin167@gmail.com'
+    if (!isAdmin && user.email !== decodedEmail) {
+      return createErrorResponse("自分のデータのみアクセス可能です", 403)
+    }
+
+    console.log(`Fetching answered surveys for email: ${decodedEmail}`)
 
     // 回答済みアンケートを取得
     const responsesQuery = query(
@@ -43,15 +51,20 @@ export async function GET(
     )
     const responsesSnapshot = await getDocs(responsesQuery)
     
+    console.log(`Found ${responsesSnapshot.docs.length} survey responses`)
+    
     const answeredSurveys = responsesSnapshot.docs
-      .map(doc => ({
-        id: doc.id,
-        survey_id: doc.data().survey_id,
-        survey_title: doc.data().survey_title,
-        points_earned: doc.data().points_earned || 0,
-        submitted_at: doc.data().submitted_at?.toDate?.()?.toISOString() || doc.data().submitted_at,
-        responses: doc.data().responses
-      }))
+      .map(doc => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          survey_id: data.survey_id,
+          survey_title: data.survey_title,
+          points_earned: data.points_earned || 0,
+          submitted_at: data.submitted_at?.toDate?.()?.toISOString() || data.submitted_at,
+          responses: data.responses
+        }
+      })
       .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()) // 新しい順にソート
 
     return NextResponse.json({ 
@@ -61,9 +74,9 @@ export async function GET(
 
   } catch (error) {
     console.error('Error fetching answered surveys:', error)
-    return NextResponse.json({ 
-      error: "回答済みアンケートの取得に失敗しました",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    return createErrorResponse(
+      "回答済みアンケートの取得に失敗しました", 
+      500
+    )
   }
-}
+})
