@@ -26,12 +26,14 @@ if (!getApps().length) {
 
 const db = getFirestore(app)
 
-// Configure web-push with VAPID keys
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || 'mailto:hikarujin167@gmail.com',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '',
-  process.env.VAPID_PRIVATE_KEY || ''
-)
+// Configure web-push with VAPID keys only if they exist
+if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:hikarujin167@gmail.com',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  )
+}
 
 // Validation schema for broadcast notification
 const BroadcastNotificationSchema = z.object({
@@ -116,6 +118,12 @@ export const POST = withAdminAuth(async (request: NextRequest, user) => {
 async function sendPushNotifications(title: string, content: string): Promise<{sent: number, failed: number}> {
   let sent = 0
   let failed = 0
+
+  // Skip push notifications if VAPID keys are not configured
+  if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    console.log('VAPID keys not configured, skipping push notifications')
+    return { sent: 0, failed: 0 }
+  }
 
   try {
     // Get all active push subscriptions
