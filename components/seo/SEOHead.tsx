@@ -33,11 +33,15 @@ export const SEOHead: FC<SEOHeadProps> = ({
       <meta property="og:type" content="website" />
       <meta property="og:site_name" content="SurQ" />
       
-      {/* Twitter */}
+      {/* X (Twitter) Card */}
       <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:site" content="@SurQ_App" />
+      <meta name="twitter:creator" content="@SurQ_App" />
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={ogImage} />
+      <meta name="twitter:image:alt" content={`${title} - SurQ アンケートプラットフォーム`} />
+      <meta name="twitter:domain" content="surq.net" />
       
       {/* Canonical URL */}
       {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}

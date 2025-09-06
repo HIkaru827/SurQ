@@ -46,8 +46,16 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'SurQ - 無料で使えるアンケートプラットフォーム',
     description: '答えてポイント獲得、作って知見共有。革新的な循環型アンケートシステム',
-    images: ['https://surq.net/surq_logo.png'],
-    creator: '@SurQ_platform',
+    images: [
+      {
+        url: 'https://surq.net/surq_logo.png',
+        alt: 'SurQ - アンケートプラットフォームのロゴ',
+        width: 1200,
+        height: 630,
+      }
+    ],
+    creator: '@SurQ_App',
+    site: '@SurQ_App',
   },
   robots: {
     index: true,
@@ -77,6 +85,9 @@ export const metadata: Metadata = {
     'apple-mobile-web-app-status-bar-style': 'default',
     'apple-mobile-web-app-title': 'SurQ',
     'msapplication-TileColor': '#3b82f6',
+    // X (Twitter) Card additional properties
+    'twitter:domain': 'surq.net',
+    'twitter:url': 'https://surq.net',
     'msapplication-tap-highlight': 'no',
   },
 }
