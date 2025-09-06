@@ -191,20 +191,6 @@ export default function AppPage() {
                   <span className="hidden sm:inline text-sm">{currentUser ? `${currentUser.name}さん` : 'マイページ'}</span>
                 </Button>
               </Link>
-              <Button
-                variant="default"
-                size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-2"
-                onClick={() => {
-                  const surveysSection = document.getElementById('surveys')
-                  if (surveysSection) {
-                    surveysSection.scrollIntoView({ behavior: 'smooth' })
-                  }
-                }}
-              >
-                <MessageSquare className="w-4 h-4 mr-1" />
-                <span className="text-sm">回答</span>
-              </Button>
               <Link href="/survey/create">
                 <Button
                   variant="outline"
