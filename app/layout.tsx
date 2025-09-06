@@ -43,15 +43,15 @@ export const metadata: Metadata = {
     ],
   },
   twitter: {
-    card: 'summary_large_image',
+    card: 'summary',
     title: 'SurQ - 無料で使えるアンケートプラットフォーム',
     description: '答えてポイント獲得、作って知見共有。革新的な循環型アンケートシステム',
     images: [
       {
         url: 'https://surq.net/surq_logo.png',
         alt: 'SurQ - アンケートプラットフォームのロゴ',
-        width: 1200,
-        height: 630,
+        width: 300,
+        height: 300,
       }
     ],
     creator: '@SurQ_App',
