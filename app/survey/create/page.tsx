@@ -584,11 +584,11 @@ function CreateSurveyPageInner() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <Card className="p-4">
                     <div className="text-center">
-                      <div className={`text-2xl font-bold ${isDevAccount ? 'text-purple-600' : 'text-primary'}`}>
-                        {isDevAccount ? '∞' : userPoints.toLocaleString()}
+                      <div className="text-2xl font-bold text-primary">
+                        {userPoints.toLocaleString()}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {isDevAccount ? '開発者アカウント' : '保有ポイント'}
+                        保有ポイント
                       </div>
                     </div>
                   </Card>
@@ -620,11 +620,6 @@ function CreateSurveyPageInner() {
                   </div>
                 )}
                 
-                {isDevAccount && (
-                  <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded-lg text-purple-800 text-sm">
-                    🚀 開発者アカウント：無制限でアンケートを作成できます
-                  </div>
-                )}
                 
                 {survey.questions.length >= MAX_QUESTIONS && (
                   <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">

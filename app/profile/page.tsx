@@ -661,8 +661,8 @@ export default function ProfilePage() {
             </Button>
             <div className="flex items-center space-x-4">
               <h1 className="font-semibold text-foreground">マイページ</h1>
-              <Badge variant="secondary" className={`${isDevAccount ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-primary/10 text-primary border-primary/20'}`}>
-                {isDevAccount ? '∞pt (開発者)' : `${localProfile.points.toLocaleString()}pt`}
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                {`${localProfile.points.toLocaleString()}pt`}
               </Badge>
             </div>
             <div className="flex items-center space-x-2">
@@ -819,10 +819,6 @@ export default function ProfilePage() {
                     <h2 className="text-xl font-bold text-foreground">{localProfile.name}</h2>
                     <p className="text-muted-foreground">{localProfile.email}</p>
                     <p className="text-sm text-muted-foreground mt-1">参加日: {formatDate(localProfile.joined_at)}</p>
-                    {/* Debug info */}
-                    <div className="text-xs text-muted-foreground mt-2 bg-muted/20 p-2 rounded">
-                      <div>開発者モード: {isDevAccount ? 'はい' : 'いいえ'}</div>
-                    </div>
                   </div>
                   
                   {/* 保有ポイント表示 */}
@@ -832,11 +828,11 @@ export default function ProfilePage() {
                         <Star className="w-4 h-4 text-primary" />
                         <span className="text-sm font-medium text-muted-foreground">保有ポイント</span>
                       </div>
-                      <div className={`text-3xl font-bold ${isDevAccount ? 'text-purple-600' : 'text-primary'}`}>
-                        {isDevAccount ? '∞' : localProfile.points.toLocaleString()}
+                      <div className="text-3xl font-bold text-primary">
+                        {localProfile.points.toLocaleString()}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        {isDevAccount ? '開発者ポイント' : 'ポイント'}
+                        ポイント
                       </div>
                     </CardContent>
                   </Card>
