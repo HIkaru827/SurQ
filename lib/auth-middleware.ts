@@ -126,8 +126,19 @@ export function validateOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin')
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001']
   
-  console.log('Origin validation:', { origin, allowedOrigins })
-  return !origin || allowedOrigins.includes(origin)
+  console.log('Origin validation:', { origin, allowedOrigins, env: process.env.ALLOWED_ORIGINS })
+  
+  // If no origin header (server-side request), allow
+  if (!origin) return true
+  
+  // Check against allowed origins
+  const isAllowed = allowedOrigins.some(allowed => allowed.trim() === origin)
+  
+  if (!isAllowed) {
+    console.error('Origin validation failed:', { origin, allowedOrigins })
+  }
+  
+  return isAllowed
 }
 
 /**
