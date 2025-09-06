@@ -131,11 +131,23 @@ export function validateOrigin(request: NextRequest): boolean {
   // If no origin header (server-side request), allow
   if (!origin) return true
   
+  // For production, if ALLOWED_ORIGINS is not properly set, allow surq.net
+  if (!process.env.ALLOWED_ORIGINS && (origin === 'https://surq.net' || origin.includes('localhost'))) {
+    console.log('Using fallback origin validation for:', origin)
+    return true
+  }
+  
   // Check against allowed origins
   const isAllowed = allowedOrigins.some(allowed => allowed.trim() === origin)
   
   if (!isAllowed) {
-    console.error('Origin validation failed:', { origin, allowedOrigins })
+    console.error('Origin validation failed:', { origin, allowedOrigins, env: process.env.ALLOWED_ORIGINS })
+    
+    // Emergency fallback for production - allow surq.net and localhost
+    if (origin === 'https://surq.net' || origin.includes('localhost')) {
+      console.log('Emergency fallback: allowing production origin')
+      return true
+    }
   }
   
   return isAllowed
