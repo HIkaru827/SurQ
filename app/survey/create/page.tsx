@@ -260,6 +260,8 @@ function CreateSurveyPageInner() {
       })
 
       if (!response.ok) {
+        const errorData = await response.text()
+        console.error('API Error:', response.status, response.statusText, errorData)
         throw new Error('アンケートの公開に失敗しました')
       }
 

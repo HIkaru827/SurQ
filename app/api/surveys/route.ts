@@ -100,6 +100,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   try {
     // Validate origin
     if (!validateOrigin(request)) {
+      console.error('Origin validation failed for request:', request.url, request.headers.get('origin'))
       return createErrorResponse('Invalid origin', 403)
     }
 
