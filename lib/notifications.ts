@@ -22,7 +22,7 @@ const db = getFirestore(app)
 export interface Notification {
   id?: string
   user_id: string
-  type: 'survey_response' | 'survey_created' | 'points_awarded' | 'system'
+  type: 'survey_response' | 'survey_created' | 'points_awarded' | 'system' | 'admin_broadcast'
   title: string
   message: string
   survey_id?: string
@@ -30,6 +30,7 @@ export interface Notification {
   respondent_name?: string
   respondent_email?: string
   points_awarded?: number
+  admin_sender?: string
   is_read: boolean
   created_at: any
 }
@@ -74,20 +75,34 @@ export async function createSurveyResponseNotification(
 
 export async function getUserNotifications(userId: string, limit: number = 20) {
   try {
+    console.log('=== getUserNotifications Debug ===')
+    console.log('Searching notifications for userId:', userId)
+    console.log('Limit:', limit)
+    
     const notificationsQuery = query(
       collection(db, 'notifications'),
       where('user_id', '==', userId)
     )
     
     const snapshot = await getDocs(notificationsQuery)
-    const notifications = snapshot.docs
-      .map(doc => ({
+    console.log('Total notifications found in Firestore:', snapshot.docs.length)
+    
+    const allNotifications = snapshot.docs.map(doc => {
+      const data = doc.data()
+      console.log('Notification document:', { id: doc.id, ...data })
+      return {
         id: doc.id,
-        ...doc.data(),
-        created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at
-      }))
+        ...data,
+        created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at
+      }
+    })
+    
+    const notifications = allNotifications
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, limit)
+    
+    console.log('Processed notifications to return:', notifications.length)
+    console.log('Notifications data:', notifications)
     
     return notifications
   } catch (error) {
@@ -131,6 +146,9 @@ export async function markAllNotificationsAsRead(userId: string) {
 
 export async function getUnreadNotificationCount(userId: string): Promise<number> {
   try {
+    console.log('=== getUnreadNotificationCount Debug ===')
+    console.log('Searching unread notifications for userId:', userId)
+    
     const unreadQuery = query(
       collection(db, 'notifications'),
       where('user_id', '==', userId),
@@ -138,6 +156,15 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
     )
     
     const snapshot = await getDocs(unreadQuery)
+    console.log('Unread notifications found:', snapshot.docs.length)
+    
+    if (snapshot.docs.length > 0) {
+      console.log('Unread notification documents:')
+      snapshot.docs.forEach(doc => {
+        console.log('Unread notification:', { id: doc.id, ...doc.data() })
+      })
+    }
+    
     return snapshot.docs.length
   } catch (error) {
     console.error('Error getting unread notification count:', error)

@@ -7,16 +7,19 @@ import { DecodedIdToken } from 'firebase-admin/auth'
 let adminApp
 try {
   if (!getApps().length) {
+    console.log('Initializing Firebase Admin with projectId:', process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID)
     // In production, you should use a service account key file
     // For development, we'll use the default credentials
     adminApp = initializeApp({
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    })
+    }, 'admin')
   } else {
-    adminApp = getApps()[0]
+    adminApp = getApps().find(app => app.name === 'admin') || getApps()[0]
   }
+  console.log('Firebase Admin initialized successfully:', adminApp.name)
 } catch (error) {
   console.error('Failed to initialize Firebase Admin:', error)
+  adminApp = null
 }
 
 const adminAuth = adminApp ? getAuth(adminApp) : null
@@ -29,19 +32,29 @@ export interface AuthenticatedRequest extends NextRequest {
  * Middleware to authenticate Firebase ID tokens
  */
 export async function authenticateUser(request: NextRequest): Promise<DecodedIdToken> {
+  console.log('=== Authentication Debug ===')
+  console.log('AdminAuth available:', !!adminAuth)
+  console.log('AdminApp available:', !!adminApp)
+  
   if (!adminAuth) {
+    console.error('Firebase Admin not initialized - adminAuth is null')
     throw new Error('Firebase Admin not initialized')
   }
 
   const authHeader = request.headers.get('Authorization')
+  console.log('Auth header present:', !!authHeader)
+  console.log('Auth header format valid:', authHeader?.startsWith('Bearer '))
+  
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw new Error('No valid authorization header')
   }
 
   const idToken = authHeader.substring(7) // Remove 'Bearer ' prefix
+  console.log('ID token length:', idToken?.length)
 
   try {
     const decodedToken = await adminAuth.verifyIdToken(idToken)
+    console.log('Token verified for user:', decodedToken.email)
     return decodedToken
   } catch (error) {
     console.error('Token verification failed:', error)

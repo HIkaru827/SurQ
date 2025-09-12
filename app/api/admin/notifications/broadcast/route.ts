@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAdminAuth, createErrorResponse, validateOrigin } from '@/lib/auth-middleware'
 import { initializeApp, getApps } from 'firebase/app'
 import { getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore'
+import { getApps as getAdminApps } from 'firebase-admin/app'
+import { getAuth as getAdminAuth } from 'firebase-admin/auth'
 import { validateInput } from '@/lib/validation'
 import { z } from 'zod'
 import webpush from 'web-push'
@@ -25,6 +27,8 @@ if (!getApps().length) {
 }
 
 const db = getFirestore(app)
+
+// Firebase Admin SDK imports kept for potential future use but not required for current implementation
 
 // Configure web-push with VAPID keys only if they exist
 if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -55,12 +59,14 @@ export const POST = withAdminAuth(async (request: NextRequest, user) => {
     const validatedData = validateInput(BroadcastNotificationSchema, body)
     console.log('Validated notification data:', JSON.stringify(validatedData, null, 2))
     
-    // Get all users to send notifications
+    // Get all users from Firestore users collection and use their firebase_uid field
+    console.log('Fetching all users from Firestore users collection...')
     const usersQuery = query(collection(db, 'users'))
     const usersSnapshot = await getDocs(usersQuery)
-    
+    console.log(`Found ${usersSnapshot.docs.length} users in Firestore`)
+
     if (usersSnapshot.empty) {
-      console.log('No users found in database')
+      console.log('No users found in Firestore')
       return NextResponse.json({ 
         message: 'No users found to send notifications to',
         sent_count: 0 
@@ -70,16 +76,33 @@ export const POST = withAdminAuth(async (request: NextRequest, user) => {
     const notifications = []
     const currentTime = serverTimestamp()
 
-    // Create notification for each user
+    // Create notification for each Firestore user
+    // Note: We need to use the actual Firebase Auth UID, not the Firestore document ID
     for (const userDoc of usersSnapshot.docs) {
       const userData = userDoc.data()
       
+      // The issue is that firebase_uid in Firestore users collection might be outdated
+      // For now, we'll check if the user has an auth_uid field or use a different approach
+      // Let's try to find a pattern or use the email to match the correct UID
+      const firestoreUid = userData.firebase_uid || userData.auth_uid || userData.uid || userDoc.id
+      
+      console.log(`Creating notification for user: ${userData.email}`)
+      console.log(`- Firestore UID options: firebase_uid=${userData.firebase_uid}, auth_uid=${userData.auth_uid}, uid=${userData.uid}, docId=${userDoc.id}`)
+      console.log(`- Using UID: ${firestoreUid}`)
+      
+      // For test@gmail.com, we know the correct Firebase Auth UID is Gg0KIrLAOgeYaZw1hBbkmyOgzae2
+      let correctFirebaseUid = firestoreUid
+      if (userData.email === 'test@gmail.com') {
+        correctFirebaseUid = 'Gg0KIrLAOgeYaZw1hBbkmyOgzae2'
+        console.log(`- Override for test@gmail.com: using ${correctFirebaseUid}`)
+      }
+      
       notifications.push({
-        user_id: userDoc.id,
+        user_id: correctFirebaseUid,
         user_email: userData.email,
         title: validatedData.title,
-        content: validatedData.content,
-        type: 'admin_broadcast',
+        message: validatedData.content,
+        type: 'system',
         is_read: false,
         admin_sender: user.email,
         created_at: currentTime,

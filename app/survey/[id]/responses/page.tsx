@@ -263,8 +263,8 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
                   </CardTitle>
                   <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                     <div className="flex items-center space-x-1">
-                      <Mail className="w-3 h-3" />
-                      <span>{response.respondent_name || 'Anonymous'}</span>
+                      <User className="w-3 h-3" />
+                      <span>匿名ユーザー</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Calendar className="w-3 h-3" />
@@ -283,12 +283,12 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
                           <div className="pl-4 py-2 bg-muted/30 rounded-md">
                             {Array.isArray(answer) ? (
                               <ul className="space-y-1">
-                                {answer.map((item, i) => (
-                                  <li key={i} className="text-sm">• {item}</li>
+                                {answer.filter(item => item !== '__selected__').map((item, i) => (
+                                  <li key={i} className="text-sm">• {item.replace(/^__SEPARATOR__:/, '')}</li>
                                 ))}
                               </ul>
                             ) : (
-                              <p className="text-sm">{String(answer)}</p>
+                              <p className="text-sm">{String(answer).replace(/__selected__/g, '').replace(/__SEPARATOR__:/g, '').trim() || answer}</p>
                             )}
                           </div>
                         </div>

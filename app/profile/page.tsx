@@ -268,13 +268,22 @@ export default function ProfilePage() {
   }
 
   const handleSendNotification = async () => {
+    console.log('=== 管理者通知送信開始 ===')
+    console.log('Title:', notificationTitle)
+    console.log('Content:', notificationContent)
+    
     if (!notificationTitle.trim() || !notificationContent.trim()) {
       toast.error("通知のタイトルと内容を入力してください")
       return
     }
     
+    console.log('User:', user)
+    console.log('User email:', user?.email)
+    console.log('Is admin?', user?.email === 'hikarujin167@gmail.com')
+    
     setIsNotificationSending(true)
     try {
+      console.log('Sending request to /api/admin/notifications/broadcast')
       const response = await authenticatedFetch('/api/admin/notifications/broadcast', {
         method: 'POST',
         body: JSON.stringify({
@@ -283,9 +292,17 @@ export default function ProfilePage() {
         })
       })
       
+      console.log('Response status:', response.status)
+      console.log('Response ok:', response.ok)
+      
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Error response data:', errorData)
         throw new Error('通知の送信に失敗しました')
       }
+      
+      const responseData = await response.json()
+      console.log('Success response data:', responseData)
       
       toast.success("全ユーザーに通知を送信しました")
       setNotificationTitle("")
@@ -489,7 +506,7 @@ export default function ProfilePage() {
     }
     
     try {
-      const response = await fetch(`/api/users/${encodeURIComponent(user.email)}/answered-surveys`)
+      const response = await authenticatedFetch(`/api/users/${encodeURIComponent(user.email)}/answered-surveys`)
       if (response.ok) {
         const data = await response.json()
         console.log('Answered surveys API response:', data)

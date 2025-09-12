@@ -28,10 +28,21 @@ export function NotificationBell() {
     if (!user) return
     
     try {
+      console.log('=== Fetching unread notification count ===')
+      console.log('User:', user?.email)
+      console.log('User UID:', user?.uid)
+      
       const response = await authenticatedFetch('/api/notifications?action=count')
+      console.log('Count API response status:', response.status)
+      console.log('Count API response ok:', response.ok)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('Count API response data:', data)
         setUnreadCount(data.unreadCount || 0)
+      } else {
+        const errorData = await response.text()
+        console.error('Count API error:', errorData)
       }
     } catch (error) {
       console.error('Failed to fetch unread count:', error)
@@ -41,12 +52,24 @@ export function NotificationBell() {
   const fetchNotifications = async () => {
     if (isLoading || !user) return
     
+    console.log('=== Fetching notifications list ===')
+    console.log('User:', user?.email)
+    console.log('User UID:', user?.uid)
+    
     setIsLoading(true)
     try {
       const response = await authenticatedFetch('/api/notifications?limit=10')
+      console.log('Notifications API response status:', response.status)
+      console.log('Notifications API response ok:', response.ok)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('Notifications API response data:', data)
+        console.log('Notifications count:', data.notifications?.length || 0)
         setNotifications(data.notifications || [])
+      } else {
+        const errorData = await response.text()
+        console.error('Notifications API error:', errorData)
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error)
