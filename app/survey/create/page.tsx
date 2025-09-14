@@ -51,7 +51,6 @@ interface PointCalculation {
 }
 
 
-const MAX_QUESTIONS = 30
 
 const questionTemplates = [
   {
@@ -288,10 +287,6 @@ function CreateSurveyPageInner() {
 
   const addQuestion = (type: QuestionType) => {
     // 質問数の上限チェック
-    if (survey.questions.length >= MAX_QUESTIONS) {
-      alert(`質問は最大${MAX_QUESTIONS}問まで追加できます`)
-      return
-    }
 
     const template = questionTemplates.find((t) => t.type === type)
     if (!template) return
@@ -595,7 +590,7 @@ function CreateSurveyPageInner() {
                   <Card className="p-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-600">{survey.questions.length}</div>
-                      <div className="text-sm text-muted-foreground">質問数 (最大{MAX_QUESTIONS}問)</div>
+                      <div className="text-sm text-muted-foreground">質問数</div>
                     </div>
                   </Card>
                   <Card className="p-4">
@@ -621,18 +616,13 @@ function CreateSurveyPageInner() {
                 )}
                 
                 
-                {survey.questions.length >= MAX_QUESTIONS && (
-                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-                    ⚠️ 質問数が上限に達しました。これ以上質問を追加できません。
-                  </div>
-                )}
               </CardContent>
             </Card>
 
             {/* Questions */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">質問 ({survey.questions.length}/{MAX_QUESTIONS})</h2>
+                <h2 className="text-xl font-semibold">質問 ({survey.questions.length})</h2>
                 {survey.questions.length === 0 && (
                   <p className="text-muted-foreground text-sm">質問を追加するには下のテンプレートをクリックしてください</p>
                 )}
@@ -786,14 +776,14 @@ function CreateSurveyPageInner() {
                         質問を追加
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        質問タイプを選択してください ({survey.questions.length}/{MAX_QUESTIONS})
+                        質問タイプを選択してください
                       </p>
                     </div>
                     
                     <div className="flex flex-wrap gap-2 justify-center">
                       {questionTemplates.map((template) => {
                         const Icon = template.icon
-                        const isDisabled = survey.questions.length >= MAX_QUESTIONS
+                        const isDisabled = false
                         return (
                           <Button
                             key={template.type}
@@ -819,11 +809,6 @@ function CreateSurveyPageInner() {
                       })}
                     </div>
                     
-                    {survey.questions.length >= MAX_QUESTIONS && (
-                      <div className="text-xs text-center text-amber-600 mt-4 p-2 bg-amber-50 rounded">
-                        質問数が上限に達しました
-                      </div>
-                    )}
                   </div>
                 </CardContent>
               </Card>
