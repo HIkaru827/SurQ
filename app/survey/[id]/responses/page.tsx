@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Calendar, User, Mail, Award, BarChart, Download } from 'lucide-react'
+import { ArrowLeft, Calendar, User, Mail, Award, BarChart, Download, PieChart, FileSpreadsheet, Copy, ChevronDown, ChevronRight } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PieChart as RechartsPieChart, Cell, BarChart as RechartsBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Pie } from 'recharts'
 
 interface Survey {
   id: string
@@ -45,6 +47,8 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [surveyId, setSurveyId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState('statistics')
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const getParams = async () => {
@@ -147,6 +151,78 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
     return question?.type || 'unknown'
   }
 
+  const toggleQuestionExpansion = (questionId: string) => {
+    const newExpanded = new Set(expandedQuestions)
+    if (newExpanded.has(questionId)) {
+      newExpanded.delete(questionId)
+    } else {
+      newExpanded.add(questionId)
+    }
+    setExpandedQuestions(newExpanded)
+  }
+
+  const calculateStatistics = (questionId: string) => {
+    const question = survey?.questions?.find(q => q.id === questionId)
+    if (!question) return null
+
+    const allAnswers = responses.map(r => r.responses[questionId]).filter(Boolean)
+
+    if (question.type === 'multiple_choice' || question.type === 'single_choice') {
+      const choices = question.choices || []
+      const stats = choices.map(choice => {
+        const count = allAnswers.filter(answer => {
+          if (Array.isArray(answer)) {
+            return answer.some(item => item.includes(choice))
+          } else {
+            return String(answer).includes(choice)
+          }
+        }).length
+
+        return {
+          choice: choice,
+          count: count,
+          percentage: responses.length > 0 ? Math.round((count / responses.length) * 100) : 0
+        }
+      })
+
+      return { type: 'choice', data: stats, total: responses.length }
+    } else {
+      return { type: 'text', data: allAnswers, total: allAnswers.length }
+    }
+  }
+
+  const getChartColors = (index: number) => {
+    const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1', '#d084d0', '#87d068']
+    return colors[index % colors.length]
+  }
+
+  const exportToCSV = () => {
+    if (!survey || !responses.length) return
+
+    const headers = ['回答者', '提出日時', ...survey.questions.map(q => q.question)]
+    const rows = responses.map((response, index) => [
+      `回答者${index + 1}`,
+      formatDate(response.submitted_at),
+      ...survey.questions.map(q => {
+        const answer = response.responses[q.id]
+        if (Array.isArray(answer)) {
+          return answer.filter(item => item !== '__selected__').map(item => item.replace(/^__SEPARATOR__:?/, '')).join(', ')
+        }
+        return String(answer || '').replace(/__selected__/g, '').replace(/__SEPARATOR__:/g, '').trim()
+      })
+    ])
+
+    const csvContent = [headers, ...rows].map(row =>
+      row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+    ).join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `${survey.title}_responses.csv`
+    link.click()
+  }
+
   if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -189,8 +265,8 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-start justify-between mb-6">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/profile">
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -198,45 +274,204 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
               </Link>
             </Button>
             <div className="flex items-center space-x-4">
-              <h1 className="font-semibold text-foreground">回答一覧</h1>
-              <Badge variant="secondary">
+              <Button onClick={exportToCSV} variant="outline" size="sm" disabled={responses.length === 0}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                CSVでエクスポート
+              </Button>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-foreground mb-2">{survey.title}</h1>
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <Badge variant="secondary" className="text-lg px-4 py-2">
                 {responses.length}件の回答
               </Badge>
             </div>
-            <div className="w-16"></div> {/* Spacer for alignment */}
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md mx-auto">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="statistics" className="flex items-center space-x-2">
+                  <PieChart className="w-4 h-4" />
+                  <span>統計</span>
+                </TabsTrigger>
+                <TabsTrigger value="responses" className="flex items-center space-x-2">
+                  <BarChart className="w-4 h-4" />
+                  <span>回答一覧</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Survey Info */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <BarChart className="w-5 h-5 text-primary" />
-              <span>{survey.title}</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {survey.description && (
-              <p className="text-muted-foreground mb-4">{survey.description}</p>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsContent value="statistics" className="space-y-6">
+            {/* Statistics View */}
+            {responses.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <div className="text-muted-foreground">
+                    <PieChart className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">まだ回答がありません</h3>
+                    <p>このアンケートにはまだ誰も回答していません。</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-6">
+                {survey.questions?.map((question, questionIndex) => {
+                  const stats = calculateStatistics(question.id)
+                  if (!stats) return null
+
+                  return (
+                    <Card key={question.id} className="overflow-hidden">
+                      <CardHeader className="pb-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg font-semibold mb-2">
+                              Q{questionIndex + 1}. {question.question}
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                              {stats.total}件の回答
+                            </p>
+                          </div>
+                          <Button variant="outline" size="sm" className="ml-4">
+                            <Copy className="w-4 h-4 mr-2" />
+                            コピー
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {stats.type === 'choice' ? (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Chart */}
+                            <div className="h-64">
+                              <ResponsiveContainer width="100%" height="100%">
+                                {question.type === 'single_choice' ? (
+                                  <RechartsPieChart>
+                                    <Pie
+                                      data={stats.data.filter(item => item.count > 0)}
+                                      cx="50%"
+                                      cy="50%"
+                                      outerRadius={80}
+                                      dataKey="count"
+                                      label={({choice, percentage}) => `${choice} (${percentage}%)`}
+                                    >
+                                      {stats.data.filter(item => item.count > 0).map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={getChartColors(index)} />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip formatter={(value, name) => [value, '回答数']} />
+                                  </RechartsPieChart>
+                                ) : (
+                                  <RechartsBarChart data={stats.data.filter(item => item.count > 0)}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="choice" tick={{fontSize: 12}} />
+                                    <YAxis />
+                                    <Tooltip formatter={(value) => [value, '回答数']} />
+                                    <Bar dataKey="count" fill="#8884d8" />
+                                  </RechartsBarChart>
+                                )}
+                              </ResponsiveContainer>
+                            </div>
+
+                            {/* Statistics */}
+                            <div className="space-y-3">
+                              {stats.data.map((item, index) => (
+                                <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/20">
+                                  <div className="flex items-center space-x-3">
+                                    <div
+                                      className="w-4 h-4 rounded-full"
+                                      style={{ backgroundColor: getChartColors(index) }}
+                                    />
+                                    <span className="font-medium">{item.choice}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="font-semibold">{item.count}</div>
+                                    <div className="text-sm text-muted-foreground">{item.percentage}%</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div
+                              className="flex items-center justify-between cursor-pointer p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                              onClick={() => toggleQuestionExpansion(question.id)}
+                            >
+                              <div className="flex items-center space-x-3">
+                                <div className="text-2xl font-semibold text-primary">
+                                  {stats.total}
+                                </div>
+                                <div>
+                                  <p className="font-medium">テキスト回答</p>
+                                  <p className="text-sm text-muted-foreground">クリックして詳細を表示</p>
+                                </div>
+                              </div>
+                              {expandedQuestions.has(question.id) ? (
+                                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                              )}
+                            </div>
+
+                            {expandedQuestions.has(question.id) && (
+                              <div className="border-l-4 border-primary pl-4 space-y-3">
+                                {stats.data.slice(0, 10).map((answer, index) => (
+                                  <div key={index} className="p-3 bg-muted/10 rounded-md">
+                                    <p className="text-sm">{String(answer).replace(/__selected__/g, '').replace(/__SEPARATOR__:/g, '').trim()}</p>
+                                  </div>
+                                ))}
+                                {stats.data.length > 10 && (
+                                  <p className="text-sm text-muted-foreground text-center">
+                                    他{stats.data.length - 10}件の回答があります
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <Calendar className="w-4 h-4" />
-                <span>作成日: {formatDate(survey.created_at)}</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <Award className="w-4 h-4" />
-                <span>回答報酬: {survey.respondent_points}pt</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <BarChart className="w-4 h-4" />
-                <span>質問数: {survey.questions?.length || 0}問</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
+
+          <TabsContent value="responses" className="space-y-6">
+            {/* Individual Responses View */}
+            {/* Survey Info */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <BarChart className="w-5 h-5 text-primary" />
+                  <span>アンケート詳細</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {survey.description && (
+                  <p className="text-muted-foreground mb-4">{survey.description}</p>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Calendar className="w-4 h-4" />
+                    <span>作成日: {formatDate(survey.created_at)}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Award className="w-4 h-4" />
+                    <span>回答報酬: {survey.respondent_points}pt</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <BarChart className="w-4 h-4" />
+                    <span>質問数: {survey.questions?.length || 0}問</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
         {/* Responses */}
         {responses.length === 0 ? (
@@ -287,7 +522,7 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
                             {Array.isArray(answer) ? (
                               <ul className="space-y-1">
                                 {answer.filter(item => item !== '__selected__').map((item, i) => (
-                                  <li key={i} className="text-sm">• {item.replace(/^__SEPARATOR__:/, '')}</li>
+                                  <li key={i} className="text-sm">• {item.replace(/^__SEPARATOR__:?/, '')}</li>
                                 ))}
                               </ul>
                             ) : (
@@ -306,6 +541,8 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
             ))}
           </div>
         )}
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   )
