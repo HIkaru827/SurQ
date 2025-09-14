@@ -167,8 +167,25 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
 
     const allAnswers = responses.map(r => r.responses[questionId]).filter(Boolean)
 
-    if (question.type === 'multiple_choice' || question.type === 'single_choice') {
-      const choices = question.choices || []
+    // 記述式以外は全て選択肢として扱う
+    if (question.type === 'text' || question.type === 'textarea') {
+      return { type: 'text', data: allAnswers, total: allAnswers.length }
+    } else {
+      // 選択肢がある場合は選択肢を使用、ない場合は実際の回答から選択肢を生成
+      let choices = question.choices || []
+
+      if (choices.length === 0) {
+        // 回答から選択肢を生成（ユニークな回答を取得）
+        const uniqueAnswers = [...new Set(allAnswers.map(answer => {
+          if (Array.isArray(answer)) {
+            return answer.filter(item => item !== '__selected__').map(item => item.replace(/^__SEPARATOR__:?/, ''))
+          } else {
+            return String(answer).replace(/__selected__/g, '').replace(/__SEPARATOR__:/g, '').trim()
+          }
+        }).flat())]
+        choices = uniqueAnswers
+      }
+
       const stats = choices.map(choice => {
         const count = allAnswers.filter(answer => {
           if (Array.isArray(answer)) {
@@ -186,8 +203,6 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
       })
 
       return { type: 'choice', data: stats, total: responses.length }
-    } else {
-      return { type: 'text', data: allAnswers, total: allAnswers.length }
     }
   }
 
@@ -346,34 +361,24 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
                       <CardContent>
                         {stats.type === 'choice' ? (
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Chart */}
+                            {/* Chart - Always use Pie Chart */}
                             <div className="h-64">
                               <ResponsiveContainer width="100%" height="100%">
-                                {question.type === 'single_choice' ? (
-                                  <RechartsPieChart>
-                                    <Pie
-                                      data={stats.data.filter(item => item.count > 0)}
-                                      cx="50%"
-                                      cy="50%"
-                                      outerRadius={80}
-                                      dataKey="count"
-                                      label={({choice, percentage}) => `${choice} (${percentage}%)`}
-                                    >
-                                      {stats.data.filter(item => item.count > 0).map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={getChartColors(index)} />
-                                      ))}
-                                    </Pie>
-                                    <Tooltip formatter={(value, name) => [value, '回答数']} />
-                                  </RechartsPieChart>
-                                ) : (
-                                  <RechartsBarChart data={stats.data.filter(item => item.count > 0)}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="choice" tick={{fontSize: 12}} />
-                                    <YAxis />
-                                    <Tooltip formatter={(value) => [value, '回答数']} />
-                                    <Bar dataKey="count" fill="#8884d8" />
-                                  </RechartsBarChart>
-                                )}
+                                <RechartsPieChart>
+                                  <Pie
+                                    data={stats.data.filter(item => item.count > 0)}
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={80}
+                                    dataKey="count"
+                                    label={({choice, percentage}) => `${choice} (${percentage}%)`}
+                                  >
+                                    {stats.data.filter(item => item.count > 0).map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={getChartColors(index)} />
+                                    ))}
+                                  </Pie>
+                                  <Tooltip formatter={(value, name) => [value, '回答数']} />
+                                </RechartsPieChart>
                               </ResponsiveContainer>
                             </div>
 
