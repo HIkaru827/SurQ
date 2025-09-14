@@ -274,11 +274,14 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {Object.entries(response.responses).map(([questionId, answer]) => (
-                      <div key={questionId}>
+                    {survey.questions?.map((question) => {
+                      const answer = response.responses[question.id]
+                      if (answer === undefined || answer === null) return null
+                      return (
+                      <div key={question.id}>
                         <div className="flex flex-col space-y-2">
                           <h4 className="font-medium text-sm text-muted-foreground">
-                            Q: {getQuestionText(questionId)}
+                            Q: {question.question}
                           </h4>
                           <div className="pl-4 py-2 bg-muted/30 rounded-md">
                             {Array.isArray(answer) ? (
@@ -292,11 +295,11 @@ export default function SurveyResponsesPage({ params }: { params: Promise<{ id: 
                             )}
                           </div>
                         </div>
-                        {Object.keys(response.responses).indexOf(questionId) < Object.keys(response.responses).length - 1 && (
+                        {survey.questions?.indexOf(question) < (survey.questions?.length || 0) - 1 && (
                           <Separator className="mt-4" />
                         )}
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </CardContent>
               </Card>
