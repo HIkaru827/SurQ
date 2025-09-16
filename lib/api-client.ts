@@ -77,25 +77,86 @@ export class AuthenticatedAPIClient {
 }
 
 /**
- * 便利なヘルパー関数
+ * PWA対応の便利なヘルパー関数（リトライ機能付き）
  */
-export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+export async function authenticatedFetch(url: string, options: RequestInit = {}, maxRetries = 3): Promise<Response> {
   if (!auth?.currentUser) {
     throw new Error('User not authenticated')
   }
 
   const token = await auth.currentUser.getIdToken()
-  
+
   const defaultHeaders = {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
   }
 
-  return fetch(url, {
+  // PWA環境での問題を検出
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
+  if (isPWA || isMobile) {
+    console.log('PWA/Mobile environment detected, using enhanced request handling')
+  }
+
+  const requestConfig: RequestInit = {
     ...options,
     headers: {
       ...defaultHeaders,
       ...options.headers,
     },
-  })
+    // PWA環境でのタイムアウト設定を短くする
+    ...(isPWA && {
+      signal: AbortSignal.timeout(30000) // 30秒タイムアウト
+    })
+  }
+
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`API request attempt ${attempt}/${maxRetries}:`, { url, method: options.method || 'GET' })
+
+      const response = await fetch(url, requestConfig)
+
+      console.log(`API response attempt ${attempt}:`, {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText
+      })
+
+      // 成功した場合は即座に返す
+      if (response.ok) {
+        return response
+      }
+
+      // 4xx エラーの場合はリトライしない
+      if (response.status >= 400 && response.status < 500) {
+        return response
+      }
+
+      // 5xx エラーの場合はリトライする
+      if (attempt < maxRetries) {
+        console.log(`Server error (${response.status}), retrying in ${attempt * 1000}ms...`)
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000))
+        continue
+      }
+
+      return response
+
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error')
+      console.error(`API request attempt ${attempt} failed:`, lastError)
+
+      // ネットワークエラーやタイムアウトの場合はリトライ
+      if (attempt < maxRetries) {
+        console.log(`Network error, retrying in ${attempt * 1000}ms...`)
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000))
+        continue
+      }
+    }
+  }
+
+  // すべてのリトライが失敗した場合
+  throw lastError || new Error('All retry attempts failed')
 }

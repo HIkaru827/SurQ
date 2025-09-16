@@ -107,6 +107,7 @@ export default withPWA({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development', // Enable PWA in production
   runtimeCaching: [
+    // Static assets
     {
       urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
       handler: 'CacheFirst',
@@ -118,14 +119,45 @@ export default withPWA({
         }
       }
     },
+    // Firebase auth and read operations only
     {
-      urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
+      urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*\?.*alt=json.*$/i,
       handler: 'NetworkFirst',
+      method: 'GET',
       options: {
-        cacheName: 'firestore-cache',
+        cacheName: 'firestore-read-cache',
         expiration: {
           maxEntries: 50,
-          maxAgeSeconds: 60 * 5 // 5 minutes
+          maxAgeSeconds: 60 * 2 // 2 minutes only
+        }
+      }
+    },
+    // API routes - Never cache POST/PUT/DELETE requests
+    {
+      urlPattern: /^https:\/\/surq\.net\/api\/.*$/i,
+      handler: 'NetworkOnly', // Always go to network
+      method: 'POST'
+    },
+    {
+      urlPattern: /^https:\/\/surq\.net\/api\/.*$/i,
+      handler: 'NetworkOnly', // Always go to network
+      method: 'PUT'
+    },
+    {
+      urlPattern: /^https:\/\/surq\.net\/api\/.*$/i,
+      handler: 'NetworkOnly', // Always go to network
+      method: 'DELETE'
+    },
+    // API GET requests can use NetworkFirst but with very short cache
+    {
+      urlPattern: /^https:\/\/surq\.net\/api\/.*$/i,
+      handler: 'NetworkFirst',
+      method: 'GET',
+      options: {
+        cacheName: 'api-cache',
+        expiration: {
+          maxEntries: 20,
+          maxAgeSeconds: 60 // 1 minute only
         }
       }
     }
