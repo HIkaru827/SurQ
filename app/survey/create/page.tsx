@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth"
 import { isDeveloperAccount } from "@/lib/developer"
 import { authenticatedFetch } from "@/lib/api-client"
@@ -100,6 +100,7 @@ const questionTemplates = [
 function CreateSurveyPageInner() {
   const { user, userProfile } = useAuth()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const editSurveyId = searchParams.get('edit')
   
   const [survey, setSurvey] = useState<Survey>({
@@ -208,18 +209,24 @@ function CreateSurveyPageInner() {
   const handlePublish = async () => {
     // バリデーション
     if (!survey.title.trim()) {
-      alert('アンケートタイトルを入力してください')
+      if (confirm('アンケートタイトルを入力してください')) {
+        return
+      }
       return
     }
 
     if (survey.questions.length === 0) {
-      alert('質問を少なくとも1つ追加してください')
+      if (confirm('質問を少なくとも1つ追加してください')) {
+        return
+      }
       return
     }
 
     // ポイント不足チェック（開発者アカウントはスキップ）
     if (!hasEnoughPoints && !isDevAccount) {
-      alert(`アンケートの公開には${pointCalculation.creatorPoints}ポイントが必要です。現在の保有ポイント: ${userPoints}`)
+      if (confirm(`アンケートの公開には${pointCalculation.creatorPoints}ポイントが必要です。現在の保有ポイント: ${userPoints}`)) {
+        return
+      }
       return
     }
 
@@ -227,13 +234,17 @@ function CreateSurveyPageInner() {
     for (let i = 0; i < survey.questions.length; i++) {
       const question = survey.questions[i]
       if (!question.question.trim()) {
-        alert(`質問 ${i + 1} の質問文を入力してください`)
+        if (confirm(`質問 ${i + 1} の質問文を入力してください`)) {
+          return
+        }
         return
       }
-      
-      if ((question.type === 'multiple-choice' || question.type === 'yes-no') && 
+
+      if ((question.type === 'multiple-choice' || question.type === 'yes-no') &&
           (!question.options || question.options.some(opt => !opt.trim()))) {
-        alert(`質問 ${i + 1} の選択肢を正しく入力してください`)
+        if (confirm(`質問 ${i + 1} の選択肢を正しく入力してください`)) {
+          return
+        }
         return
       }
     }
@@ -242,21 +253,37 @@ function CreateSurveyPageInner() {
     const creatorId = user?.uid || 'anonymous-user'
 
     setIsPublishing(true)
+    console.log('=== Publishing Survey Debug ===')
+    console.log('User:', user?.email)
+    console.log('Survey data:', survey)
+    console.log('Point calculation:', pointCalculation)
+    console.log('Device info:', {
+      userAgent: navigator.userAgent,
+      isMobile: /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    })
+
     try {
       const url = editSurveyId ? `/api/surveys/${editSurveyId}` : '/api/surveys'
       const method = editSurveyId ? 'PUT' : 'POST'
-      
+
+      const requestData = {
+        ...survey,
+        creator_id: creatorId,
+        creator_email: user?.email,
+        is_published: true,
+        respondent_points: pointCalculation.respondentPoints,
+        creator_points: pointCalculation.creatorPoints
+      }
+
+      console.log('API Request:', { url, method, requestData })
+
       const response = await authenticatedFetch(url, {
         method: method,
-        body: JSON.stringify({
-          ...survey,
-          creator_id: creatorId,
-          creator_email: user?.email,
-          is_published: true,
-          respondent_points: pointCalculation.respondentPoints,
-          creator_points: pointCalculation.creatorPoints
-        })
+        body: JSON.stringify(requestData)
       })
+
+      console.log('API Response status:', response.status)
+      console.log('API Response ok:', response.ok)
 
       if (!response.ok) {
         const errorData = await response.text()
@@ -271,15 +298,20 @@ function CreateSurveyPageInner() {
       
       surveyEvents.createSurvey(surveyId, surveyType)
       surveyEvents.publishSurvey(surveyId)
-      
-      alert('アンケートが公開されました！')
-      
-      // アプリページにリダイレクト
-      window.location.href = '/app'
-      
+
+      // 成功メッセージを表示してからリダイレクト
+      if (confirm('アンケートが公開されました！')) {
+        // Next.js Routerを使用してリダイレクト
+        router.push('/app')
+      } else {
+        router.push('/app')
+      }
+
     } catch (error) {
       console.error('Error publishing survey:', error)
-      alert('アンケートの公開に失敗しました。もう一度お試しください。')
+      if (confirm('アンケートの公開に失敗しました。もう一度お試しください。')) {
+        // エラー時もconfirmで対応
+      }
     } finally {
       setIsPublishing(false)
     }
@@ -512,11 +544,17 @@ function CreateSurveyPageInner() {
                   </>
                 )}
               </Button>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 onClick={handlePublish}
-                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || !hasEnoughPoints}
-                className={`p-2 sm:px-3 ${!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onTouchEnd={(e) => {
+                  e.preventDefault()
+                  if (!isPublishing && survey.questions.length > 0 && survey.title.trim() && (hasEnoughPoints || isDevAccount)) {
+                    handlePublish()
+                  }
+                }}
+                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || (!hasEnoughPoints && !isDevAccount)}
+                className={`p-2 sm:px-3 ${!hasEnoughPoints && pointCalculation.creatorPoints > 0 && !isDevAccount ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {isPublishing ? (
                   <span className="text-sm">公開中...</span>
@@ -830,11 +868,17 @@ function CreateSurveyPageInner() {
                   </>
                 )}
               </Button>
-              <Button 
+              <Button
                 onClick={handlePublish}
-                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || !hasEnoughPoints}
-                className={!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'opacity-60' : ''}
-                title={!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? `ポイントが${pointCalculation.creatorPoints - userPoints}不足しています` : ''}
+                onTouchEnd={(e) => {
+                  e.preventDefault()
+                  if (!isPublishing && survey.questions.length > 0 && survey.title.trim() && hasEnoughPoints) {
+                    handlePublish()
+                  }
+                }}
+                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || (!hasEnoughPoints && !isDevAccount)}
+                className={!hasEnoughPoints && pointCalculation.creatorPoints > 0 && !isDevAccount ? 'opacity-60' : ''}
+                title={!hasEnoughPoints && pointCalculation.creatorPoints > 0 && !isDevAccount ? `ポイントが${pointCalculation.creatorPoints - userPoints}不足しています` : ''}
               >
                 {isPublishing ? (
                   <>公開中...</>

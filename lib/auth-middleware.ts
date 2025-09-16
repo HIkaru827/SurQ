@@ -8,11 +8,27 @@ let adminApp
 try {
   if (!getApps().length) {
     console.log('Initializing Firebase Admin with projectId:', process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID)
-    // In production, you should use a service account key file
-    // For development, we'll use the default credentials
-    adminApp = initializeApp({
+
+    // Use service account credentials if available, otherwise fall back to default
+    let adminConfig: any = {
       projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    }, 'admin')
+    }
+
+    // Check if we have service account environment variables
+    if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+      console.log('Using service account credentials from environment variables')
+      adminConfig.credential = cert({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      })
+    } else {
+      console.log('Service account credentials not found, using default credentials')
+      // For local development, Firebase Admin SDK will use Application Default Credentials
+      // or the GOOGLE_APPLICATION_CREDENTIALS environment variable
+    }
+
+    adminApp = initializeApp(adminConfig, 'admin')
   } else {
     adminApp = getApps().find(app => app.name === 'admin') || getApps()[0]
   }
@@ -67,6 +83,11 @@ export async function authenticateUser(request: NextRequest): Promise<DecodedIdT
  */
 export function isAdminUser(user: DecodedIdToken): boolean {
   const adminEmails = process.env.ADMIN_EMAILS?.split(',') || []
+  console.log('Admin check:', {
+    userEmail: user.email,
+    adminEmails: adminEmails,
+    isAdmin: adminEmails.includes(user.email || '')
+  })
   return adminEmails.includes(user.email || '')
 }
 
@@ -103,20 +124,37 @@ export function withAuth(handler: (request: NextRequest, user: DecodedIdToken, .
 export function withAdminAuth(handler: (request: NextRequest, user: DecodedIdToken, ...args: any[]) => Promise<NextResponse>) {
   return async (request: NextRequest, ...args: any[]): Promise<NextResponse> => {
     try {
+      console.log('=== Admin Auth Flow ===')
       const user = await authenticateUser(request)
-      
-      if (!isAdminUser(user)) {
-        return NextResponse.json({ 
-          error: 'Admin access required' 
+      console.log('User authenticated successfully:', user.email)
+
+      const isAdmin = isAdminUser(user)
+      console.log('Admin check result:', isAdmin)
+
+      if (!isAdmin) {
+        console.log('Admin access denied for user:', user.email)
+        return NextResponse.json({
+          error: 'Admin access required',
+          debug: {
+            userEmail: user.email,
+            adminEmails: process.env.ADMIN_EMAILS?.split(',') || [],
+            isAdmin: isAdmin
+          }
         }, { status: 403 })
       }
-      
+
+      console.log('Admin access granted for user:', user.email)
       return await handler(request, user, ...args)
     } catch (error) {
+      console.error('Admin auth error:', error)
       const message = error instanceof Error ? error.message : 'Authentication failed'
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Authentication required',
-        message 
+        message,
+        debug: {
+          adminAuthAvailable: !!adminAuth,
+          adminAppAvailable: !!adminApp
+        }
       }, { status: 401 })
     }
   }
