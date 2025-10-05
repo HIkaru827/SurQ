@@ -22,12 +22,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import { PushNotificationSetup } from "@/components/notifications/PushNotificationSetup"
 import { Progress } from "@/components/ui/progress"
-import { 
-  User, 
-  Settings, 
-  Trophy, 
-  Star, 
-  MessageSquare, 
+import {
+  User,
+  Settings,
+  Trophy,
+  Star,
+  MessageSquare,
   BarChart3,
   Edit,
   Plus,
@@ -52,7 +52,8 @@ import {
   Ticket,
   Save,
   Send,
-  Shield
+  Shield,
+  Mail
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import {
