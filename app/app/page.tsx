@@ -7,7 +7,7 @@ import { authenticatedFetch } from '@/lib/api-client'
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { BarChart3, Users, Trophy, Zap, ArrowRight, PlusCircle, MessageSquare, Star, User } from "lucide-react"
+import { BarChart3, Users, Trophy, Zap, ArrowRight, PlusCircle, MessageSquare, Star, User, Mail } from "lucide-react"
 import Link from "next/link"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 
@@ -380,6 +380,35 @@ export default function AppPage() {
           )}
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-muted/30 border-t border-border py-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-lg">S</span>
+              </div>
+              <span className="text-xl font-bold text-foreground">SurQ</span>
+            </div>
+
+            <div className="flex items-center">
+              <Link href="/contact">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                  <Mail className="w-4 h-4 mr-2" />
+                  お問い合わせ
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-border text-center">
+            <p className="text-sm text-muted-foreground">
+              © 2024 SurQ. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

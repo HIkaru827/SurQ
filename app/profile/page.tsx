@@ -245,13 +245,15 @@ export default function ProfilePage() {
   const [notificationTitle, setNotificationTitle] = useState("")
   const [notificationContent, setNotificationContent] = useState("")
   const [isNotificationSending, setIsNotificationSending] = useState(false)
+  const [contacts, setContacts] = useState<any[]>([])
+  const [contactsLoading, setContactsLoading] = useState(false)
   
   const isDevAccount = user?.email ? isDeveloperAccount(user.email) : false
   const isAdmin = user?.email === 'hikarujin167@gmail.com'
 
   const fetchCouponHistory = async () => {
     if (!user?.email) return
-    
+
     try {
       const response = await authenticatedFetch(`/api/coupons?email=${encodeURIComponent(user.email)}`)
       if (response.ok) {
@@ -264,6 +266,27 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error fetching coupon history:', error)
       setCouponHistory([])
+    }
+  }
+
+  const fetchContacts = async () => {
+    if (!isDevAccount) return
+
+    setContactsLoading(true)
+    try {
+      const response = await authenticatedFetch('/api/contact/list')
+      if (response.ok) {
+        const data = await response.json()
+        setContacts(data.contacts || [])
+      } else {
+        console.error('Failed to fetch contacts')
+        setContacts([])
+      }
+    } catch (error) {
+      console.error('Error fetching contacts:', error)
+      setContacts([])
+    } finally {
+      setContactsLoading(false)
     }
   }
 
@@ -384,11 +407,18 @@ export default function ProfilePage() {
         return
       }
       // 並列実行で高速化
-      Promise.all([
+      const promises = [
         fetchUserData(),
         fetchUserSurveys(),
-        fetchAnsweredSurveys()
-      ]).finally(() => {
+        fetchAnsweredSurveys(),
+        fetchCouponHistory()
+      ]
+
+      if (isDevAccount) {
+        promises.push(fetchContacts())
+      }
+
+      Promise.all(promises).finally(() => {
         setLoading(false)
       })
     }
@@ -399,7 +429,7 @@ export default function ProfilePage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
       const tab = params.get('tab')
-      if (tab && ['surveys', 'answered', 'analytics', 'achievements', 'activity'].includes(tab)) {
+      if (tab && ['surveys', 'answered', 'analytics', 'achievements', 'activity', 'contacts'].includes(tab)) {
         setActiveTab(tab)
       }
     }
@@ -963,7 +993,7 @@ export default function ProfilePage() {
                 <TabsTrigger value="surveys" className="text-xs sm:text-sm py-2 px-2 sm:px-3">公開済み</TabsTrigger>
                 <TabsTrigger value="drafts" className="text-xs sm:text-sm py-2 px-2 sm:px-3">下書き</TabsTrigger>
                 <TabsTrigger value="answered" className="text-xs sm:text-sm py-2 px-2 sm:px-3">回答済み</TabsTrigger>
-                <TabsTrigger value="analytics" className="text-xs sm:text-sm py-2 px-2 sm:px-3">分析</TabsTrigger>
+                {isDevAccount && <TabsTrigger value="contacts" className="text-xs sm:text-sm py-2 px-2 sm:px-3">お問い合わせ</TabsTrigger>}
                 <TabsTrigger value="achievements" className="text-xs sm:text-sm py-2 px-2 sm:px-3">実績</TabsTrigger>
                 <TabsTrigger value="activity" className="text-xs sm:text-sm py-2 px-2 sm:px-3">活動</TabsTrigger>
                 <TabsTrigger value="settings" className="text-xs sm:text-sm py-2 px-2 sm:px-3">設定</TabsTrigger>
@@ -1454,6 +1484,85 @@ export default function ProfilePage() {
                   </Card>
                 )}
               </TabsContent>
+
+              {/* Contacts Tab (Developer Only) */}
+              {isDevAccount && (
+                <TabsContent value="contacts" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Mail className="w-5 h-5 text-primary" />
+                        <span>お問い合わせ一覧</span>
+                        <Badge variant="secondary">{contacts.length}件</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {contactsLoading ? (
+                        <div className="text-center py-8">
+                          <div className="text-muted-foreground">読み込み中...</div>
+                        </div>
+                      ) : contacts.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Mail className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">お問い合わせはありません</h3>
+                          <p className="text-muted-foreground">
+                            まだお問い合わせが投稿されていません
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {contacts.map((contact) => (
+                            <Card key={contact.id} className="border-l-4 border-l-primary">
+                              <CardContent className="p-4">
+                                <div className="space-y-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <h4 className="font-semibold text-foreground">{contact.subject}</h4>
+                                      <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
+                                        {contact.userEmail && (
+                                          <span>from: {contact.userEmail}</span>
+                                        )}
+                                        <span>•</span>
+                                        <span>
+                                          {new Date(contact.created_at).toLocaleDateString('ja-JP', {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <Badge
+                                      variant={contact.status === 'unread' ? 'default' : 'secondary'}
+                                    >
+                                      {contact.status === 'unread' ? '未読' : '既読'}
+                                    </Badge>
+                                  </div>
+                                  <div className="bg-muted/30 p-3 rounded-md">
+                                    <p className="text-sm text-foreground whitespace-pre-wrap">
+                                      {contact.content}
+                                    </p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                          {contacts.length > 0 && (
+                            <div className="text-center pt-4">
+                              <Button variant="outline" onClick={fetchContacts}>
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                更新
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              )}
 
               {/* Achievements Tab */}
               <TabsContent value="achievements" className="space-y-6">
