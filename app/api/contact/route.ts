@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       userEmail: userEmail || null,
       status: 'unread',
       userAgent: request.headers.get('user-agent'),
-      ip: request.ip || request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+      ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
     }
