@@ -43,7 +43,7 @@ export const createUser = async (userData: {
   
   const userDoc = {
     ...userData,
-    points: 0,
+    points: 50,
     level: 1,
     badges: [],
     surveys_created: 0,
