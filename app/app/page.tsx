@@ -404,7 +404,7 @@ export default function AppPage() {
 
           <div className="mt-6 pt-6 border-t border-border text-center">
             <p className="text-sm text-muted-foreground">
-              © 2024 SurQ. All rights reserved.
+              © 2026 SurQ. All rights reserved.
             </p>
           </div>
         </div>

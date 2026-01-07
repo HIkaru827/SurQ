@@ -712,6 +712,12 @@ export default function ProfilePage() {
               <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
                 {`${localProfile.points.toLocaleString()}pt`}
               </Badge>
+              {isDevAccount && (
+                <Badge variant="secondary" className="bg-purple-50 text-purple-700 border-purple-200">
+                  <Shield className="w-3 h-3 mr-1" />
+                  管理者
+                </Badge>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               <NotificationBell />
@@ -727,6 +733,14 @@ export default function ProfilePage() {
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
+                    {isDevAccount && (
+                      <Link href="/admin/dashboard">
+                        <Button variant="outline" className="w-full justify-start bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100">
+                          <Shield className="w-4 h-4 mr-2" />
+                          管理者ダッシュボード
+                        </Button>
+                      </Link>
+                    )}
                     <Button variant="outline" className="w-full justify-start">
                       <Edit className="w-4 h-4 mr-2" />
                       マイページ編集
