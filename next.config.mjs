@@ -69,7 +69,7 @@ const nextConfig = {
   experimental: {
     workerThreads: false,
   },
-  serverExternalPackages: [],
+  serverExternalPackages: ['firebase-admin'],
   // 開発時のタイムアウトを延長
   devIndicators: {
     position: 'bottom-left',
