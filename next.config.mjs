@@ -54,14 +54,11 @@ const nextConfig = {
       }
     ]
   },
-  eslint: {
-    // Enable build error checking for production
-    ignoreDuringBuilds: process.env.NODE_ENV === 'development',
-  },
   typescript: {
     // Enable type checking for production
     ignoreBuildErrors: process.env.NODE_ENV === 'development',
   },
+  turbopack: {},
   images: {
     unoptimized: true,
     formats: ['image/webp', 'image/avif'],
