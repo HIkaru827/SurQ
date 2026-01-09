@@ -60,7 +60,7 @@ export const GET = withAuth(async (
           id: doc.id,
           survey_id: data.survey_id,
           survey_title: data.survey_title,
-          points_earned: data.points_earned || 0,
+          // points_earned: data.points_earned || 0, // 廃止 - 回答数ベースのシステムに移行
           submitted_at: data.submitted_at?.toDate?.()?.toISOString() || data.submitted_at,
           responses: data.responses
         }

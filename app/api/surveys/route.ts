@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { calculateSurveyPoints, Question } from "@/lib/points"
+import { Question } from "@/lib/points"
 import { isDeveloperAccount } from "@/lib/developer"
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp, updateDoc, doc } from "firebase/firestore"
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp, updateDoc, doc, increment } from "firebase/firestore"
 import { withAuth, createErrorResponse, validateOrigin, authenticateUser } from "@/lib/auth-middleware"
-import { validateInput, SurveySchema, QueryParamsSchema, validateSufficientPoints } from "@/lib/validation"
+import { validateInput, SurveySchema, QueryParamsSchema, validateCanCreateSurvey } from "@/lib/validation"
 
 // Firebase client config for server-side usage
 const firebaseConfig = {
@@ -110,9 +110,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     // Validate input data
     const validatedData = validateInput(SurveySchema, body)
     console.log('Validated data:', JSON.stringify(validatedData, null, 2))
-    
-    // ポイント計算
-    const points = calculateSurveyPoints(validatedData.questions as Question[])
 
     const surveyData = {
       title: validatedData.title,
@@ -120,14 +117,14 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       creator_id: user.uid, // Use authenticated user's UID
       questions: validatedData.questions || [],
       is_published: validatedData.is_published || false,
-      respondent_points: validatedData.respondent_points || points.respondentPoints,
-      creator_points: validatedData.creator_points || points.creatorPoints,
+      // respondent_points: 廃止
+      // creator_points: 廃止
       response_count: 0,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
     }
 
-    // 公開時はユーザーのポイントをチェック・消費（開発者アカウントはスキップ）
+    // 公開時はユーザーの投稿権をチェック・消費（開発者アカウントはスキップ）
     if (validatedData.is_published) {
       const isDevAccount = isDeveloperAccount(user.email!)
       
@@ -137,14 +134,16 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         
         if (!userSnapshot.empty) {
           const userDoc = userSnapshot.docs[0]
-          const currentPoints = userDoc.data().points || 0
+          const userData = userDoc.data()
+          const surveys_answered = userData.surveys_answered || 0
+          const surveys_created = userData.surveys_created || 0
           
-          // Validate sufficient points
-          validateSufficientPoints(currentPoints, surveyData.creator_points)
+          // 投稿権チェック（4回答 = 1投稿権）
+          validateCanCreateSurvey(surveys_answered, surveys_created)
           
-          // ポイント消費
+          // 投稿数をインクリメント
           await updateDoc(doc(db, 'users', userDoc.id), {
-            points: currentPoints - surveyData.creator_points,
+            surveys_created: increment(1),
             updated_at: serverTimestamp()
           })
         }

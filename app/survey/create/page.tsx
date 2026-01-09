@@ -31,10 +31,10 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { 
-  calculateSurveyPoints, 
+  canCreateSurvey,
+  calculateAvailablePosts,
+  answersUntilNextPost,
   getQuestionTypeLabel, 
-  getQuestionTypeDescription,
-  POINT_RATES,
   QuestionType,
   Question
 } from "@/lib/points"
@@ -45,10 +45,10 @@ interface Survey {
   questions: Question[]
 }
 
-interface PointCalculation {
-  respondentPoints: number
-  creatorPoints: number
-}
+// interface PointCalculation { // 廃止
+//   respondentPoints: number
+//   creatorPoints: number
+// }
 
 
 
@@ -57,7 +57,7 @@ const questionTemplates = [
     type: "yes-no" as QuestionType,
     icon: MessageSquare,
     label: "はい/いいえ",
-    description: "回答者：0.5pt / 投稿者：1pt",
+    description: "シンプルな二択質問",
     template: {
       question: "質問を入力してください",
       options: ["はい", "いいえ"],
@@ -68,7 +68,7 @@ const questionTemplates = [
     type: "rating" as QuestionType,
     icon: Star,
     label: "1〜5評価",
-    description: "回答者：1pt / 投稿者：2pt",
+    description: "満足度などの評価",
     template: {
       question: "満足度を教えてください",
       required: true,
@@ -78,7 +78,7 @@ const questionTemplates = [
     type: "multiple-choice" as QuestionType,
     icon: CheckSquare,
     label: "複数選択肢",
-    description: "回答者：1pt / 投稿者：2.5pt",
+    description: "複数の選択肢から選択",
     template: {
       question: "質問を入力してください",
       options: ["選択肢1", "選択肢2", "選択肢3"],
@@ -89,7 +89,7 @@ const questionTemplates = [
     type: "text" as QuestionType,
     icon: Type,
     label: "自由記述",
-    description: "回答者：1.5pt / 投稿者：5pt",
+    description: "自由な意見を記入",
     template: {
       question: "ご意見をお聞かせください",
       required: false,
@@ -116,10 +116,13 @@ function CreateSurveyPageInner() {
   const [isLoading, setIsLoading] = useState(false)
   const [originalSurvey, setOriginalSurvey] = useState<any>(null)
 
-  const pointCalculation = calculateSurveyPoints(survey.questions)
-  const userPoints = userProfile?.points || 0
+  // const pointCalculation = calculateSurveyPoints(survey.questions) // 廃止
+  // const userPoints = userProfile?.points || 0 // 廃止
   const isDevAccount = user?.email ? isDeveloperAccount(user.email) : false
-  const hasEnoughPoints = isDevAccount || userPoints >= pointCalculation.creatorPoints
+  const surveys_answered = userProfile?.surveys_answered || 0
+  const surveys_created = userProfile?.surveys_created || 0
+  const availablePosts = calculateAvailablePosts(surveys_answered, surveys_created)
+  const canPost = isDevAccount || canCreateSurvey(surveys_answered, surveys_created)
   
   
   // 編集モード時のデータ読み込み
@@ -179,8 +182,8 @@ function CreateSurveyPageInner() {
           creator_id: creatorId,
           creator_email: user?.email,
           is_published: false, // 下書きとして保存
-          respondent_points: pointCalculation.respondentPoints,
-          creator_points: pointCalculation.creatorPoints
+          // respondent_points: pointCalculation.respondentPoints, // 廃止
+          // creator_points: pointCalculation.creatorPoints // 廃止
         })
       })
 
@@ -222,9 +225,11 @@ function CreateSurveyPageInner() {
       return
     }
 
-    // ポイント不足チェック（開発者アカウントはスキップ）
-    if (!hasEnoughPoints && !isDevAccount) {
-      if (confirm(`アンケートの公開には${pointCalculation.creatorPoints}ポイントが必要です。現在の保有ポイント: ${userPoints}`)) {
+    // 投稿権チェック（開発者アカウントはスキップ）
+    if (!canPost && !isDevAccount) {
+      const answersNeeded = answersUntilNextPost(surveys_answered)
+      if (confirm(`投稿権が不足しています。あと${answersNeeded}回アンケートに回答すると投稿できます。\n\n現在の回答数: ${surveys_answered}\n投稿可能回数: ${availablePosts}`)) {
+        router.push('/app')
         return
       }
       return
@@ -256,7 +261,7 @@ function CreateSurveyPageInner() {
     console.log('=== Publishing Survey Debug ===')
     console.log('User:', user?.email)
     console.log('Survey data:', survey)
-    console.log('Point calculation:', pointCalculation)
+    console.log('Available posts:', availablePosts)
     console.log('Device info:', {
       userAgent: navigator.userAgent,
       isMobile: /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
@@ -271,8 +276,8 @@ function CreateSurveyPageInner() {
         creator_id: creatorId,
         creator_email: user?.email,
         is_published: true,
-        respondent_points: pointCalculation.respondentPoints,
-        creator_points: pointCalculation.creatorPoints
+        // respondent_points: pointCalculation.respondentPoints, // 廃止
+        // creator_points: pointCalculation.creatorPoints // 廃止
       }
 
       console.log('API Request:', { url, method, requestData })
@@ -519,7 +524,7 @@ function CreateSurveyPageInner() {
               {user && (
                 <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-medium text-xs sm:text-sm px-2 py-1">
                   <Star className="w-3 h-3 mr-1" />
-                  {userPoints.toLocaleString()}pt
+                  {isDevAccount ? '∞回投稿可能' : `投稿可能: ${availablePosts}回`}
                 </Badge>
               )}
             </div>
@@ -549,12 +554,12 @@ function CreateSurveyPageInner() {
                 onClick={handlePublish}
                 onTouchEnd={(e) => {
                   e.preventDefault()
-                  if (!isPublishing && survey.questions.length > 0 && survey.title.trim() && (hasEnoughPoints || isDevAccount)) {
+                  if (!isPublishing && survey.questions.length > 0 && survey.title.trim() && (canPost || isDevAccount)) {
                     handlePublish()
                   }
                 }}
-                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || (!hasEnoughPoints && !isDevAccount)}
-                className={`p-2 sm:px-3 ${!hasEnoughPoints && pointCalculation.creatorPoints > 0 && !isDevAccount ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || (!canPost && !isDevAccount)}
+                className={`p-2 sm:px-3 ${!canPost && !isDevAccount ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {isPublishing ? (
                   <span className="text-sm">公開中...</span>
@@ -606,7 +611,7 @@ function CreateSurveyPageInner() {
           <div className="lg:col-span-3 space-y-6">
 
             {/* Point Calculation Display */}
-            <Card className={`border-2 ${!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'border-red-200 bg-red-50/30' : 'border-primary/20 bg-primary/5'}`}>
+            <Card className={`border-2 ${!canPost && !isDevAccount ? 'border-red-200 bg-red-50/30' : 'border-primary/20 bg-primary/5'}`}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Star className="w-5 h-5 text-yellow-500" />
@@ -618,10 +623,10 @@ function CreateSurveyPageInner() {
                   <Card className="p-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-primary">
-                        {userPoints.toLocaleString()}
+                        {isDevAccount ? '∞' : availablePosts}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        保有ポイント
+                        投稿可能回数
                       </div>
                     </div>
                   </Card>
@@ -633,23 +638,15 @@ function CreateSurveyPageInner() {
                   </Card>
                   <Card className="p-4">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{pointCalculation.respondentPoints}pt</div>
-                      <div className="text-sm text-muted-foreground">回答者がもらえるポイント</div>
-                    </div>
-                  </Card>
-                  <Card className="p-4">
-                    <div className="text-center">
-                      <div className={`text-2xl font-bold ${!hasEnoughPoints && pointCalculation.creatorPoints > 0 ? 'text-red-600' : 'text-orange-600'}`}>
-                        {pointCalculation.creatorPoints}pt
-                      </div>
-                      <div className="text-sm text-muted-foreground">投稿に必要なポイント</div>
+                      <div className="text-2xl font-bold text-green-600">{surveys_answered}</div>
+                      <div className="text-sm text-muted-foreground">回答数</div>
                     </div>
                   </Card>
                 </div>
                 
-                {!hasEnoughPoints && pointCalculation.creatorPoints > 0 && !isDevAccount && (
+                {!canPost && !isDevAccount && (
                   <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
-                    ⚠️ ポイントが不足しています。あと{pointCalculation.creatorPoints - userPoints}ポイント必要です。
+                    ⚠️ 投稿権が不足しています。あと{answersUntilNextPost(surveys_answered)}回答すると投稿できます。
                   </div>
                 )}
                 
@@ -872,13 +869,13 @@ function CreateSurveyPageInner() {
                 onClick={handlePublish}
                 onTouchEnd={(e) => {
                   e.preventDefault()
-                  if (!isPublishing && survey.questions.length > 0 && survey.title.trim() && hasEnoughPoints) {
+                  if (!isPublishing && survey.questions.length > 0 && survey.title.trim() && canPost) {
                     handlePublish()
                   }
                 }}
-                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || (!hasEnoughPoints && !isDevAccount)}
-                className={!hasEnoughPoints && pointCalculation.creatorPoints > 0 && !isDevAccount ? 'opacity-60' : ''}
-                title={!hasEnoughPoints && pointCalculation.creatorPoints > 0 && !isDevAccount ? `ポイントが${pointCalculation.creatorPoints - userPoints}不足しています` : ''}
+                disabled={isPublishing || survey.questions.length === 0 || !survey.title.trim() || (!canPost && !isDevAccount)}
+                className={!canPost && !isDevAccount ? 'opacity-60' : ''}
+                title={!canPost && !isDevAccount ? `投稿権が不足しています。あと${answersUntilNextPost(surveys_answered)}回答が必要です` : ''}
               >
                 {isPublishing ? (
                   <>公開中...</>

@@ -203,14 +203,10 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
               )}
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="bg-muted/30 p-4 rounded-lg text-center">
                   <div className="text-2xl font-bold text-primary">{survey.questions.length}</div>
                   <div className="text-sm text-muted-foreground">質問数</div>
-                </div>
-                <div className="bg-muted/30 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-primary">{survey.respondent_points}</div>
-                  <div className="text-sm text-muted-foreground">獲得ポイント</div>
                 </div>
                 <div className="bg-muted/30 p-4 rounded-lg text-center">
                   <div className="text-2xl font-bold text-primary">{survey.response_count || 0}</div>
@@ -225,7 +221,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
               <div className="text-center space-y-4">
                 <div className="flex items-center justify-center space-x-2 text-primary">
                   <Trophy className="w-5 h-5" />
-                  <span className="font-medium">回答完了で {survey.respondent_points} ポイント獲得！</span>
+                  <span className="font-medium">4回答で投稿権+1回！</span>
                 </div>
                 
                 <Button 
@@ -382,7 +378,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
               <p className="text-muted-foreground">ご協力ありがとうございました</p>
               <div className="flex items-center justify-center space-x-2">
                 <Badge variant="secondary" className="text-lg px-4 py-2">
-                  <Star className="w-4 h-4 mr-2 text-yellow-500" />+{survey.respondent_points} ポイント獲得
+                  <Star className="w-4 h-4 mr-2 text-yellow-500" />回答完了！
                 </Badge>
               </div>
             </div>

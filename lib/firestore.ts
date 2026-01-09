@@ -43,7 +43,7 @@ export const createUser = async (userData: {
   
   const userDoc = {
     ...userData,
-    points: 50,
+    // points: 50, // 廃止 - 回答数ベースのシステムに移行
     level: 1,
     badges: [],
     surveys_created: 0,
@@ -103,8 +103,8 @@ export const createSurvey = async (surveyData: {
   creator_id: string
   questions: any[]
   is_published: boolean
-  respondent_points: number
-  creator_points: number
+  // respondent_points: number // 廃止
+  // creator_points: number // 廃止
 }) => {
   if (!db) throw new Error('Firestore not initialized')
   
@@ -187,7 +187,7 @@ export const updateSurvey = async (surveyId: string, updates: any) => {
 export const deleteSurvey = async (surveyId: string) => {
   if (!db) throw new Error('Firestore not initialized')
   
-  // First get the survey to return point information
+  // First get the survey to return post count information
   const survey = await getSurvey(surveyId)
   if (!survey) {
     throw new Error('Survey not found')
@@ -197,21 +197,20 @@ export const deleteSurvey = async (surveyId: string) => {
   const surveyRef = doc(db, COLLECTIONS.SURVEYS, surveyId)
   await deleteDoc(surveyRef)
   
-  // Return points if no responses
-  const pointsReturned = (survey as any).response_count === 0 ? (survey as any).creator_points : 0
+  // If no responses, decrement surveys_created (return post quota)
+  const shouldReturnPostQuota = (survey as any).response_count === 0
   
-  // If points should be returned, update user points
-  if (pointsReturned > 0) {
+  if (shouldReturnPostQuota) {
     const userRef = doc(db, COLLECTIONS.USERS, (survey as any).creator_id)
     await updateDoc(userRef, {
-      points: increment(pointsReturned),
+      surveys_created: increment(-1),
       updated_at: serverTimestamp()
     })
   }
   
   return {
     survey,
-    pointsReturned
+    postQuotaReturned: shouldReturnPostQuota
   }
 }
 

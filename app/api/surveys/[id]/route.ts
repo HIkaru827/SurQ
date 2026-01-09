@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { calculateSurveyPoints } from "@/lib/points"
+// import { calculateSurveyPoints } from "@/lib/points" // 廃止
 import { initializeApp, getApps } from "firebase/app"
 import { getFirestore, doc, getDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore"
 
@@ -66,8 +66,7 @@ export async function PUT(
       return NextResponse.json({ error: "Survey not found" }, { status: 404 })
     }
     
-    // ポイント計算
-    const points = calculateSurveyPoints(body.questions || [])
+    // ポイント計算は廃止
 
     // アンケートデータを更新
     const updates = {
@@ -75,8 +74,8 @@ export async function PUT(
       description: body.description || null,
       questions: body.questions || [],
       is_published: body.is_published !== undefined ? body.is_published : surveyDoc.data()?.is_published,
-      respondent_points: points.respondentPoints,
-      creator_points: points.creatorPoints,
+      // respondent_points: points.respondentPoints, // 廃止
+      // creator_points: points.creatorPoints, // 廃止
       updated_at: serverTimestamp()
     }
 
@@ -120,7 +119,7 @@ export async function DELETE(
     return NextResponse.json({ 
       message: "Survey deleted successfully",
       survey: { id, ...surveyData },
-      pointsReturned: surveyData?.response_count === 0 ? surveyData.creator_points : 0
+      postQuotaReturned: surveyData?.response_count === 0
     })
   } catch (error) {
     console.error('Error deleting survey:', error)

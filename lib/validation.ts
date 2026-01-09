@@ -4,7 +4,7 @@ import { z } from 'zod'
 export const UserSchema = z.object({
   email: z.string().email('無効なメールアドレスです'),
   name: z.string().min(1, '名前は必須です').max(100, '名前は100文字以内で入力してください'),
-  points: z.number().int().min(0).optional().default(0)
+  // points: z.number().int().min(0).optional().default(0) // 廃止
 })
 
 // Question validation schema
@@ -25,8 +25,8 @@ export const SurveySchema = z.object({
   title: z.string().min(1, 'タイトルは必須です').max(200, 'タイトルは200文字以内で入力してください'),
   description: z.string().max(1000, '説明は1000文字以内で入力してください').optional().nullable(),
   questions: z.array(QuestionSchema).max(50, '質問は50個以内で作成してください'),
-  respondent_points: z.number().min(0).max(1000, '回答者ポイントは1000以下である必要があります').optional().default(0),
-  creator_points: z.number().min(0).optional().default(0),
+  // respondent_points: z.number().min(0).max(1000, '回答者ポイントは1000以下である必要があります').optional().default(0), // 廃止
+  // creator_points: z.number().min(0).optional().default(0), // 廃止
   is_published: z.boolean().optional().default(false)
 }).refine((data) => {
   // 公開時は質問が必須、下書き時は不要
@@ -41,8 +41,8 @@ export const SurveyUpdateSchema = z.object({
   title: z.string().min(1, 'タイトルは必須です').max(200, 'タイトルは200文字以内で入力してください').optional(),
   description: z.string().max(1000, '説明は1000文字以内で入力してください').optional().nullable(),
   questions: z.array(QuestionSchema).max(50, '質問は50個以内で作成してください').optional(),
-  respondent_points: z.number().min(0).max(1000, '回答者ポイントは1000以下である必要があります').optional(),
-  creator_points: z.number().min(0).optional(),
+  // respondent_points: z.number().min(0).max(1000, '回答者ポイントは1000以下である必要があります').optional(), // 廃止
+  // creator_points: z.number().min(0).optional(), // 廃止
   is_published: z.boolean().optional()
 })
 
@@ -124,10 +124,13 @@ export function validateSurveyOwnership(userEmail: string, surveyCreatorId: stri
 }
 
 /**
- * Validate sufficient points for survey creation
+ * Validate sufficient posts for survey creation
+ * 投稿権があるかチェック（4回答 = 1投稿権）
  */
-export function validateSufficientPoints(userPoints: number, requiredPoints: number): void {
-  if (userPoints < requiredPoints) {
-    throw new Error(`ポイントが不足しています。必要ポイント: ${requiredPoints}, 保有ポイント: ${userPoints}`)
+export function validateCanCreateSurvey(surveys_answered: number, surveys_created: number): void {
+  const availablePosts = Math.floor(surveys_answered / 4) - surveys_created
+  if (availablePosts <= 0) {
+    const answersNeeded = 4 - (surveys_answered % 4)
+    throw new Error(`投稿権が不足しています。あと${answersNeeded}回アンケートに回答すると投稿できます。`)
   }
 }

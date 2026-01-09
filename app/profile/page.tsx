@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { isDeveloperAccount } from '@/lib/developer'
 import { authenticatedFetch } from '@/lib/api-client'
+import { calculateAvailablePosts, answersUntilNextPost } from '@/lib/points'
 import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -79,8 +80,8 @@ interface Survey {
   questions: any[]
   is_published: boolean
   response_count: number
-  respondent_points: number
-  creator_points: number
+  // respondent_points: number // 廃止
+  // creator_points: number // 廃止
   created_at: string
   updated_at: string
 }
@@ -90,7 +91,7 @@ interface UserProfile {
   name: string
   email: string
   avatar_url?: string
-  points: number
+  // points: number // 廃止 - 回答数ベースのシステムに移行
   level: number
   badges: string[]
   surveys_created: number
@@ -103,7 +104,7 @@ interface AnsweredSurvey {
   id: string
   survey_id: string
   survey_title: string
-  points_earned: number
+  // points_earned: number // 廃止
   submitted_at: string
   responses: any
 }
@@ -171,25 +172,21 @@ const recentActivity = [
   {
     type: "survey_completed",
     title: "カフェの利用体験に関するアンケート",
-    points: 50,
     date: "2時間前",
   },
   {
     type: "badge_earned",
     title: "人気クリエイター バッジを獲得",
-    points: 100,
     date: "1日前",
   },
   {
     type: "survey_created",
     title: "新商品に関するアンケートを作成",
-    points: 25,
     date: "3日前",
   },
   {
     type: "survey_completed",
     title: "働き方に関するアンケート",
-    points: 75,
     date: "5日前",
   },
 ]
@@ -223,11 +220,11 @@ const mockAnalytics = {
 }
 
 const levelInfo = {
-  ブロンズ: { min: 0, max: 500, color: "bg-amber-600" },
-  シルバー: { min: 500, max: 2000, color: "bg-gray-400" },
-  ゴールド: { min: 2000, max: 5000, color: "bg-yellow-500" },
-  プラチナ: { min: 5000, max: 10000, color: "bg-blue-400" },
-  ダイヤモンド: { min: 10000, max: Number.POSITIVE_INFINITY, color: "bg-purple-500" },
+  ブロンズ: { min: 0, max: 10, color: "bg-amber-600" },
+  シルバー: { min: 10, max: 30, color: "bg-gray-400" },
+  ゴールド: { min: 30, max: 60, color: "bg-yellow-500" },
+  プラチナ: { min: 60, max: 100, color: "bg-blue-400" },
+  ダイヤモンド: { min: 100, max: Number.POSITIVE_INFINITY, color: "bg-purple-500" },
 }
 
 export default function ProfilePage() {
@@ -364,17 +361,9 @@ export default function ProfilePage() {
 
       if (response.ok && data.success) {
         // 成功時の処理
-        surveyEvents.earnPoints(data.pointsAdded, 'coupon_redemption')
-        toast.success(`${data.pointsAdded}ポイントが追加されました！`)
+        // surveyEvents.earnPoints(data.pointsAdded, 'coupon_redemption') // ポイントシステム廃止
+        toast.success(`クーポンが適用されました！投稿権+${data.postsAdded || 1}回`)
         setCouponCode('')
-        
-        // ローカルプロフィールのポイントを即座に更新
-        if (localProfile) {
-          setLocalProfile({
-            ...localProfile,
-            points: data.newTotal
-          })
-        }
         
         // AuthContextのキャッシュもクリア
         if (user?.uid) {
@@ -445,7 +434,7 @@ export default function ProfilePage() {
           name: user.displayName || userProfile.name || 'ユーザー',
           email: user.email || userProfile.email,
           avatar_url: user.photoURL || userProfile.avatar_url || undefined,
-          points: userProfile.points || 0,
+          // points: userProfile.points || 0, // 廃止
           level: userProfile.level || 1,
           badges: userProfile.badges || [],
           surveys_created: userProfile.surveys_created || 0,
@@ -566,9 +555,9 @@ export default function ProfilePage() {
           // ローカルプロフィールを更新
           setLocalProfile(prevProfile => ({
             ...prevProfile!,
-            points: data.user.points || 0,
+            // points: data.user.points || 0, // 廃止
             surveys_answered: data.user.surveys_answered || 0,
-            level: Math.floor((data.user.points || 0) / 100) + 1
+            level: Math.floor((data.user.surveys_answered || 0) / 10) + 1
           }))
         }
       }
@@ -596,8 +585,8 @@ export default function ProfilePage() {
         setUserSurveys(prev => prev.filter(survey => survey.id !== surveyId))
         
         const message = hasResponses 
-          ? 'アンケートが削除されました（ポイント返還なし）'
-          : 'アンケートが削除され、ポイントが返還されました'
+          ? 'アンケートが削除されました（投稿権返還なし）'
+          : 'アンケートが削除され、投稿権が返還されました'
         
         toast.success(message)
         
@@ -614,20 +603,20 @@ export default function ProfilePage() {
 
   const getProgressToNextLevel = () => {
     if (!localProfile) return 0
-    const pointsForCurrentLevel = localProfile.level * 100
-    const pointsForNextLevel = (localProfile.level + 1) * 100
-    const currentProgress = localProfile.points - pointsForCurrentLevel
-    const totalNeeded = pointsForNextLevel - pointsForCurrentLevel
+    const answersForCurrentLevel = localProfile.level * 10
+    const answersForNextLevel = (localProfile.level + 1) * 10
+    const currentProgress = localProfile.surveys_answered - answersForCurrentLevel
+    const totalNeeded = answersForNextLevel - answersForCurrentLevel
     return Math.min(100, (currentProgress / totalNeeded) * 100)
   }
 
   const getCurrentLevelName = () => {
     if (!localProfile) return 'ブロンズ'
-    const points = localProfile.points
-    if (points >= 10000) return 'ダイヤモンド'
-    if (points >= 5000) return 'プラチナ'
-    if (points >= 2000) return 'ゴールド'
-    if (points >= 500) return 'シルバー'
+    const answersCount = localProfile.surveys_answered
+    if (answersCount >= 100) return 'ダイヤモンド'
+    if (answersCount >= 60) return 'プラチナ'
+    if (answersCount >= 30) return 'ゴールド'
+    if (answersCount >= 10) return 'シルバー'
     return 'ブロンズ'
   }
 
@@ -710,7 +699,7 @@ export default function ProfilePage() {
             <div className="flex items-center space-x-4">
               <h1 className="font-semibold text-foreground">マイページ</h1>
               <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                {`${localProfile.points.toLocaleString()}pt`}
+                {isDevAccount ? '∞回投稿可能' : `投稿可能: ${calculateAvailablePosts(localProfile.surveys_answered || 0, localProfile.surveys_created || 0)}回`}
               </Badge>
               {isDevAccount && (
                 <Badge variant="secondary" className="bg-purple-50 text-purple-700 border-purple-200">
@@ -883,19 +872,24 @@ export default function ProfilePage() {
                     <p className="text-sm text-muted-foreground mt-1">参加日: {formatDate(localProfile.joined_at)}</p>
                   </div>
                   
-                  {/* 保有ポイント表示 */}
+                  {/* 投稿可能回数表示 */}
                   <Card className="bg-primary/5 border-primary/20">
                     <CardContent className="p-4 text-center">
                       <div className="flex items-center justify-center space-x-2 mb-2">
                         <Star className="w-4 h-4 text-primary" />
-                        <span className="text-sm font-medium text-muted-foreground">保有ポイント</span>
+                        <span className="text-sm font-medium text-muted-foreground">投稿可能回数</span>
                       </div>
                       <div className="text-3xl font-bold text-primary">
-                        {localProfile.points.toLocaleString()}
+                        {isDevAccount ? '∞' : calculateAvailablePosts(localProfile.surveys_answered || 0, localProfile.surveys_created || 0)}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        ポイント
+                        回
                       </div>
+                      {!isDevAccount && (
+                        <div className="text-xs text-muted-foreground mt-2">
+                          あと{answersUntilNextPost(localProfile.surveys_answered || 0)}回答で+1回
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
@@ -919,7 +913,7 @@ export default function ProfilePage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>次のレベルまで</span>
-                    <span className="font-medium">{((localProfile.level + 1) * 100 - localProfile.points)}pt</span>
+                    <span className="font-medium">{((localProfile.level + 1) * 10 - localProfile.surveys_answered)}回答</span>
                   </div>
                   <Progress value={levelProgress} className="h-3" />
                   <div className="flex justify-between text-xs text-muted-foreground">
@@ -1056,7 +1050,6 @@ export default function ProfilePage() {
                                 <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                                   <span>質問数: {survey.questions.length}</span>
                                   <span>回答数: {survey.response_count}</span>
-                                  <span>獲得ポイント: {survey.creator_points}pt</span>
                                   <span>作成日: {formatDate(survey.created_at)}</span>
                                 </div>
                               </div>
@@ -1117,11 +1110,11 @@ export default function ProfilePage() {
                                             「{survey.title}」を削除しますか？
                                             {survey.response_count === 0 ? (
                                               <span className="block mt-2 text-green-600">
-                                                回答者がいないため、消費したポイント（{survey.creator_points}pt）が返還されます。
+                                                回答者がいないため、投稿権が返還されます。
                                               </span>
                                             ) : (
                                               <span className="block mt-2 text-red-600">
-                                                既に{survey.response_count}件の回答があるため、ポイントの返還はありません。
+                                                既に{survey.response_count}件の回答があるため、投稿権の返還はありません。
                                               </span>
                                             )}
                                           </AlertDialogDescription>
@@ -1295,12 +1288,11 @@ export default function ProfilePage() {
                                 <div className="flex items-center space-x-2 mb-2">
                                   <h3 className="font-semibold text-foreground">{survey.survey_title}</h3>
                                   <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">
-                                    +{survey.points_earned}pt
+                                    回答済み
                                   </Badge>
                                 </div>
                                 <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                                   <span>回答日: {formatDate(survey.submitted_at)}</span>
-                                  <span>獲得ポイント: {survey.points_earned}pt</span>
                                 </div>
                               </div>
                               <div className="flex items-center space-x-2">
@@ -1318,7 +1310,7 @@ export default function ProfilePage() {
                         {answeredSurveys.length > 0 && (
                           <div className="text-center pt-4 border-t">
                             <p className="text-sm text-muted-foreground">
-                              総獲得ポイント: {answeredSurveys.reduce((sum, survey) => sum + survey.points_earned, 0)}pt
+                              総回答数: {answeredSurveys.length}件
                             </p>
                           </div>
                         )}
@@ -1383,8 +1375,8 @@ export default function ProfilePage() {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs text-muted-foreground">総ポイント</p>
-                          <p className="text-lg font-bold text-foreground">{localProfile?.points || 0}</p>
+                          <p className="text-xs text-muted-foreground">投稿可能回数</p>
+                          <p className="text-lg font-bold text-foreground">{isDevAccount ? '∞' : calculateAvailablePosts(localProfile?.surveys_answered || 0, localProfile?.surveys_created || 0)}</p>
                         </div>
                         <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                           <Trophy className="w-4 h-4 text-primary" />
@@ -1659,7 +1651,6 @@ export default function ProfilePage() {
                             <p className="font-medium text-foreground">{activity.title}</p>
                             <p className="text-sm text-muted-foreground">{activity.date}</p>
                           </div>
-                          <Badge variant="secondary">+{activity.points}pt</Badge>
                         </div>
                       ))}
                     </div>

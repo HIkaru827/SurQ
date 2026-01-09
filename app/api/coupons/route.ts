@@ -25,15 +25,16 @@ if (!getApps().length) {
 const db = getFirestore(app)
 
 // Load valid coupons from environment variables for security
+// Format: CODE:ANSWERS:DESCRIPTION (e.g., "WELCOME:4:Welcome bonus")
 function getValidCoupons() {
   const couponsEnv = process.env.VALID_COUPONS || ''
-  const coupons: Record<string, { points: number; description: string }> = {}
+  const coupons: Record<string, { answersToAdd: number; description: string }> = {}
   
   couponsEnv.split(',').forEach(couponStr => {
-    const [code, points, description] = couponStr.split(':')
-    if (code && points && description) {
+    const [code, answers, description] = couponStr.split(':')
+    if (code && answers && description) {
       coupons[code.trim()] = {
-        points: parseInt(points.trim()),
+        answersToAdd: parseInt(answers.trim()),
         description: description.trim()
       }
     }
@@ -91,13 +92,13 @@ export const POST = withAuth(async (request: NextRequest, user) => {
 
       const userDoc = userSnapshot.docs[0]
       const userData = userDoc.data()
-      const currentPoints = userData.points || 0
-      const newPoints = currentPoints + couponData.points
+      const currentAnswers = userData.surveys_answered || 0
+      const newAnswers = currentAnswers + couponData.answersToAdd
 
-      // Update user points
+      // Update user surveys_answered
       const userRef = doc(db, 'users', userDoc.id)
       transaction.update(userRef, {
-        points: newPoints,
+        surveys_answered: newAnswers,
         updated_at: serverTimestamp()
       })
 
@@ -107,15 +108,17 @@ export const POST = withAuth(async (request: NextRequest, user) => {
         user_id: userDoc.id,
         user_email: email,
         coupon_code: upperCouponCode,
-        points_added: couponData.points,
+        answers_added: couponData.answersToAdd,
+        posts_added: Math.floor(couponData.answersToAdd / 4),
         description: couponData.description,
         used_at: serverTimestamp(),
         created_at: serverTimestamp()
       })
 
       return {
-        pointsAdded: couponData.points,
-        newTotal: newPoints,
+        answersAdded: couponData.answersToAdd,
+        postsAdded: Math.floor(couponData.answersToAdd / 4),
+        newAnswersTotal: newAnswers,
         description: couponData.description
       }
     })
@@ -170,7 +173,8 @@ export const GET = withAuth(async (request: NextRequest, user) => {
       .map(doc => ({
         id: doc.id,
         code: doc.data().coupon_code,
-        points: doc.data().points_added,
+        answersAdded: doc.data().answers_added || doc.data().points_added || 0, // backwards compatibility
+        postsAdded: doc.data().posts_added || Math.floor((doc.data().answers_added || doc.data().points_added || 0) / 4),
         description: doc.data().description,
         usedAt: doc.data().used_at?.toDate?.()?.toISOString() || doc.data().used_at
       }))

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import { isDeveloperAccount } from '@/lib/developer'
 import { authenticatedFetch } from '@/lib/api-client'
+import { calculateAvailablePosts } from '@/lib/points'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -326,23 +327,7 @@ export default function AdminDashboardPage() {
                         )}
                       </button>
                     </TableHead>
-                    <TableHead>
-                      <button
-                        onClick={() => handleSort('points')}
-                        className="flex items-center space-x-1 hover:text-primary"
-                      >
-                        <span>現在のポイント</span>
-                        {sortField === 'points' ? (
-                          sortOrder === 'desc' ? (
-                            <ArrowDown className="w-4 h-4" />
-                          ) : (
-                            <ArrowUp className="w-4 h-4" />
-                          )
-                        ) : (
-                          <ArrowUpDown className="w-4 h-4 opacity-50" />
-                        )}
-                      </button>
-                    </TableHead>
+                    <TableHead>投稿可能回数</TableHead>
                     <TableHead>回答数 (Give)</TableHead>
                     <TableHead>投稿数 (Take)</TableHead>
                     <TableHead>
@@ -394,7 +379,7 @@ export default function AdminDashboardPage() {
                       <TableCell>
                         <div className="flex items-center space-x-1">
                           <Coins className="w-4 h-4 text-yellow-500" />
-                          <span>{user.points.toLocaleString()}</span>
+                          <span>{calculateAvailablePosts(user.surveys_answered || 0, user.surveys_created || 0)}回</span>
                         </div>
                       </TableCell>
                       <TableCell>{user.surveys_answered}</TableCell>
@@ -450,10 +435,10 @@ export default function AdminDashboardPage() {
               {/* User Info */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-muted-foreground">現在のポイント</Label>
+                  <Label className="text-muted-foreground">投稿可能回数</Label>
                   <div className="text-2xl font-bold flex items-center space-x-2 mt-1">
                     <Coins className="w-6 h-6 text-yellow-500" />
-                    <span>{selectedUser.points.toLocaleString()}</span>
+                    <span>{calculateAvailablePosts(selectedUser.surveys_answered || 0, selectedUser.surveys_created || 0)}回</span>
                   </div>
                 </div>
                 <div>

@@ -72,7 +72,7 @@ export interface User {
   email: string
   name: string
   avatar_url: string | null
-  points: number
+  // points: number // 廃止 - 回答数ベースのシステムに移行
   level: number
   badges: any[]
   surveys_created: number
@@ -80,6 +80,16 @@ export interface User {
   total_responses_received: number
   created_at: string
   updated_at: string
+}
+
+/**
+ * 投稿可能回数を計算する
+ * @param surveys_answered 回答したアンケート総数
+ * @param surveys_created 投稿したアンケート総数
+ * @returns 投稿可能回数
+ */
+export function calculateAvailablePosts(surveys_answered: number, surveys_created: number): number {
+  return Math.max(0, Math.floor(surveys_answered / 4) - surveys_created)
 }
 
 export interface Survey {
@@ -90,8 +100,8 @@ export interface Survey {
   questions: any
   is_published: boolean
   response_count: number
-  respondent_points: number
-  creator_points: number
+  // respondent_points: number // 廃止
+  // creator_points: number // 廃止
   created_at: string
   updated_at: string
 }

@@ -1,23 +1,7 @@
-// ポイント制度の計算ロジック
+// 回答数ベースのアンケート投稿制度
+// 4回答 = 1投稿権
 
 export type QuestionType = "multiple-choice" | "rating" | "text" | "yes-no"
-
-export interface PointRates {
-  respondent: number
-  creator: number
-}
-
-export const POINT_RATES: Record<QuestionType, PointRates> = {
-  "yes-no": { respondent: 0.5, creator: 1 },
-  "rating": { respondent: 1.0, creator: 2 },
-  "multiple-choice": { respondent: 1.0, creator: 2.5 },
-  "text": { respondent: 1.5, creator: 5 }
-} as const
-
-export interface PointCalculation {
-  respondentPoints: number
-  creatorPoints: number
-}
 
 export interface Question {
   id: string
@@ -30,35 +14,32 @@ export interface Question {
 }
 
 /**
- * アンケートの質問からポイントを計算する
- */
-export function calculateSurveyPoints(questions: Question[]): PointCalculation {
-  const totalRespondentPoints = questions.reduce((sum, question) => {
-    return sum + POINT_RATES[question.type].respondent
-  }, 0)
-  
-  const totalCreatorPoints = questions.reduce((sum, question) => {
-    return sum + POINT_RATES[question.type].creator
-  }, 0)
-  
-  return {
-    respondentPoints: Math.round(totalRespondentPoints * 10) / 10,
-    creatorPoints: Math.round(totalCreatorPoints * 10) / 10
-  }
-}
-
-/**
- * ユーザーのポイントを更新する
- */
-export function updateUserPoints(currentPoints: number, pointsToAdd: number): number {
-  return Math.max(0, currentPoints + pointsToAdd)
-}
-
-/**
  * ユーザーがアンケートを投稿できるかチェックする
+ * @param surveys_answered 回答したアンケート総数
+ * @param surveys_created 投稿したアンケート総数
+ * @returns 投稿可能かどうか
  */
-export function canCreateSurvey(userPoints: number, requiredPoints: number): boolean {
-  return userPoints >= requiredPoints
+export function canCreateSurvey(surveys_answered: number, surveys_created: number): boolean {
+  return Math.floor(surveys_answered / 4) > surveys_created
+}
+
+/**
+ * 投稿可能回数を計算する
+ * @param surveys_answered 回答したアンケート総数
+ * @param surveys_created 投稿したアンケート総数
+ * @returns 投稿可能回数
+ */
+export function calculateAvailablePosts(surveys_answered: number, surveys_created: number): number {
+  return Math.max(0, Math.floor(surveys_answered / 4) - surveys_created)
+}
+
+/**
+ * 次の投稿権を獲得するために必要な回答数を計算
+ * @param surveys_answered 回答したアンケート総数
+ * @returns 次の投稿権まであと何回答が必要か
+ */
+export function answersUntilNextPost(surveys_answered: number): number {
+  return 4 - (surveys_answered % 4)
 }
 
 /**

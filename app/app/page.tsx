@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import { isDeveloperAccount } from '@/lib/developer'
 import { authenticatedFetch } from '@/lib/api-client'
+import { calculateAvailablePosts, answersUntilNextPost } from '@/lib/points'
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -19,8 +20,8 @@ interface Survey {
   questions: any[]
   is_published: boolean
   response_count: number
-  respondent_points: number
-  creator_points: number
+  // respondent_points: number // 廃止
+  // creator_points: number // 廃止
   created_at: string
   updated_at: string
   has_answered?: boolean
@@ -180,7 +181,7 @@ export default function AppPage() {
               {userProfile && (
                 <div className="flex items-center">
                   <Badge variant="secondary" className={`font-medium text-xs sm:text-sm px-2 py-1 ${isDevAccount ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-primary/10 text-primary border-primary/20'}`}>
-                    {isDevAccount ? '∞pt' : `${userProfile.points?.toLocaleString() || '0'}pt`}
+                    {isDevAccount ? '∞回投稿可能' : `投稿可能: ${calculateAvailablePosts(userProfile.surveys_answered || 0, userProfile.surveys_created || 0)}回`}
                   </Badge>
                 </div>
               )}
@@ -247,12 +248,6 @@ export default function AppPage() {
                         </div>
                         
                         <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center space-x-1 sm:space-x-2">
-                            <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
-                            <span className="text-xs sm:text-sm font-medium">
-                              {survey.creator_points}pt消費
-                            </span>
-                          </div>
                           <Badge variant="outline" className="text-xs px-2 py-1">
                             {formatDate(survey.created_at)}
                           </Badge>
@@ -338,12 +333,6 @@ export default function AppPage() {
                       </div>
                       
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center space-x-1 sm:space-x-2">
-                          <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
-                          <span className="text-xs sm:text-sm font-medium text-green-600">
-                            +{survey.respondent_points}pt
-                          </span>
-                        </div>
                         <Badge variant="outline" className="text-xs px-2 py-1">
                           {formatDate(survey.created_at)}
                         </Badge>

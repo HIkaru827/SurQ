@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, serverTimestamp, getDoc } from "firebase/firestore"
+import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc, serverTimestamp, getDoc, increment } from "firebase/firestore"
 import { withAuth, createErrorResponse, validateOrigin, authenticateUser } from "@/lib/auth-middleware"
 import { validateInput, ResponseSchema, EmailSchema } from "@/lib/validation"
 import { createSurveyResponseNotification } from "@/lib/notifications"
@@ -70,7 +70,7 @@ export async function POST(
       respondent_email,
       respondent_name: respondent_name || 'Anonymous',
       responses,
-      points_earned: surveyData.respondent_points || 0,
+      // points_earned: 廃止
       submitted_at: serverTimestamp(),
       created_at: serverTimestamp()
     }
@@ -83,39 +83,31 @@ export async function POST(
       updated_at: serverTimestamp()
     })
 
-    // 回答者にポイントを付与
+    // 回答者の回答数をインクリメント
     if (respondent_email) {
-      console.log('Awarding points to user:', respondent_email, 'Points:', surveyData.respondent_points)
+      console.log('Incrementing surveys_answered for user:', respondent_email)
       const usersQuery = query(collection(db, 'users'), where('email', '==', respondent_email))
       const userSnapshot = await getDocs(usersQuery)
       
       if (!userSnapshot.empty) {
-        // 既存ユーザーのポイント更新
+        // 既存ユーザーの回答数を更新
         const userDoc = userSnapshot.docs[0]
-        const currentPoints = userDoc.data().points || 0
-        const newPoints = currentPoints + (surveyData.respondent_points || 0)
         
-        console.log('Updating existing user points:', {
-          email: respondent_email,
-          currentPoints,
-          pointsToAdd: surveyData.respondent_points,
-          newPoints
-        })
+        console.log('Updating existing user surveys_answered')
         
         await updateDoc(doc(db, 'users', userDoc.id), {
-          points: newPoints,
           surveys_answered: (userDoc.data().surveys_answered || 0) + 1,
           updated_at: serverTimestamp()
         })
         
-        console.log('Points updated successfully')
+        console.log('surveys_answered updated successfully')
       } else {
         // ユーザーが存在しない場合、新規作成
-        console.log('Creating new user with points:', surveyData.respondent_points)
+        console.log('Creating new user')
         const newUserData = {
           name: respondent_name || 'Anonymous User',
           email: respondent_email,
-          points: surveyData.respondent_points || 0,
+          // points: 廃止
           surveys_answered: 1,
           surveys_created: 0,
           level: 1,
