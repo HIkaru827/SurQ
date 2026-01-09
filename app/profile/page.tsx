@@ -92,7 +92,7 @@ interface UserProfile {
   email: string
   avatar_url?: string
   // points: number // 廃止 - 回答数ベースのシステムに移行
-  level: number
+  // level: number // 廃止 - 回答数ベースのシステムに移行
   badges: string[]
   surveys_created: number
   surveys_answered: number
@@ -435,7 +435,7 @@ export default function ProfilePage() {
           email: user.email || userProfile.email,
           avatar_url: user.photoURL || userProfile.avatar_url || undefined,
           // points: userProfile.points || 0, // 廃止
-          level: userProfile.level || 1,
+          // level: userProfile.level || 1, // 廃止
           badges: userProfile.badges || [],
           surveys_created: userProfile.surveys_created || 0,
           surveys_answered: userProfile.surveys_answered || 0,
@@ -453,8 +453,6 @@ export default function ProfilePage() {
           name: user.displayName || 'ユーザー',
           email: user.email || 'user@example.com',
           avatar_url: user.photoURL || undefined,
-          points: 0,
-          level: 1,
           badges: [],
           surveys_created: 0,
           surveys_answered: 0,
@@ -471,8 +469,6 @@ export default function ProfilePage() {
           name: user.displayName || 'ユーザー',
           email: user.email || 'user@example.com',
           avatar_url: user.photoURL || undefined,
-          points: 0,
-          level: 1,
           badges: [],
           surveys_created: 0,
           surveys_answered: 0,
@@ -601,28 +597,6 @@ export default function ProfilePage() {
     }
   }
 
-  const getProgressToNextLevel = () => {
-    if (!localProfile) return 0
-    const answersForCurrentLevel = localProfile.level * 10
-    const answersForNextLevel = (localProfile.level + 1) * 10
-    const currentProgress = localProfile.surveys_answered - answersForCurrentLevel
-    const totalNeeded = answersForNextLevel - answersForCurrentLevel
-    return Math.min(100, (currentProgress / totalNeeded) * 100)
-  }
-
-  const getCurrentLevelName = () => {
-    if (!localProfile) return 'ブロンズ'
-    const answersCount = localProfile.surveys_answered
-    if (answersCount >= 100) return 'ダイヤモンド'
-    if (answersCount >= 60) return 'プラチナ'
-    if (answersCount >= 30) return 'ゴールド'
-    if (answersCount >= 10) return 'シルバー'
-    return 'ブロンズ'
-  }
-
-  const levelProgress = getProgressToNextLevel()
-  const currentLevelName = getCurrentLevelName()
-  const currentLevelInfo = levelInfo[currentLevelName as keyof typeof levelInfo]
 
   const handleLogout = () => {
     try {
@@ -897,33 +871,6 @@ export default function ProfilePage() {
             </Card>
 
             {/* Level Progress */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Trophy className="w-5 h-5 text-primary" />
-                  <span>レベル</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-center">
-                  <Badge variant="secondary" className={cn("text-white text-lg px-4 py-2", currentLevelInfo.color)}>
-                    {currentLevelName}
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>次のレベルまで</span>
-                    <span className="font-medium">{((localProfile.level + 1) * 10 - localProfile.surveys_answered)}回答</span>
-                  </div>
-                  <Progress value={levelProgress} className="h-3" />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Lv.{localProfile.level}</span>
-                    <span>Lv.{localProfile.level + 1}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Quick Stats */}
             <Card>
               <CardHeader>
@@ -942,10 +889,6 @@ export default function ProfilePage() {
                   <div className="text-center p-3 bg-muted/30 rounded-lg">
                     <div className="text-2xl font-bold text-primary">{localProfile.total_responses_received}</div>
                     <div className="text-xs text-muted-foreground">総回答数</div>
-                  </div>
-                  <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">Lv.{localProfile.level}</div>
-                    <div className="text-xs text-muted-foreground">レベル</div>
                   </div>
                 </div>
               </CardContent>

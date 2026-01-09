@@ -54,11 +54,3 @@ export function getQuestionTypeLabel(type: QuestionType): string {
   }
   return labels[type]
 }
-
-/**
- * 質問タイプの説明を取得する
- */
-export function getQuestionTypeDescription(type: QuestionType): string {
-  const rates = POINT_RATES[type]
-  return `回答者：${rates.respondent}pt / 投稿者：${rates.creator}pt`
-}

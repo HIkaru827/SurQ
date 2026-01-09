@@ -680,9 +680,6 @@ function CreateSurveyPageInner() {
                         <Badge variant="secondary">
                           {questionTemplates.find((t) => t.type === question.type)?.label}
                         </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          回答者: {POINT_RATES[question.type].respondent}pt / 投稿者: {POINT_RATES[question.type].creator}pt
-                        </Badge>
                       </div>
                       <Button
                         variant="ghost"
