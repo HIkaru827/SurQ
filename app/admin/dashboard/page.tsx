@@ -75,7 +75,7 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [sortField, setSortField] = useState<SortField>('reportCount')
+  const [sortField, setSortField] = useState<SortField>('created_at')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [pointsInput, setPointsInput] = useState('')
   const [pointsOperation, setPointsOperation] = useState<'add' | 'subtract' | 'set'>('add')
@@ -309,8 +309,40 @@ export default function AdminDashboardPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ユーザー名</TableHead>
-                    <TableHead>現在のポイント</TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('name')}
+                        className="flex items-center space-x-1 hover:text-primary"
+                      >
+                        <span>ユーザー名</span>
+                        {sortField === 'name' ? (
+                          sortOrder === 'desc' ? (
+                            <ArrowDown className="w-4 h-4" />
+                          ) : (
+                            <ArrowUp className="w-4 h-4" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="w-4 h-4 opacity-50" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('points')}
+                        className="flex items-center space-x-1 hover:text-primary"
+                      >
+                        <span>現在のポイント</span>
+                        {sortField === 'points' ? (
+                          sortOrder === 'desc' ? (
+                            <ArrowDown className="w-4 h-4" />
+                          ) : (
+                            <ArrowUp className="w-4 h-4" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="w-4 h-4 opacity-50" />
+                        )}
+                      </button>
+                    </TableHead>
                     <TableHead>回答数 (Give)</TableHead>
                     <TableHead>投稿数 (Take)</TableHead>
                     <TableHead>
@@ -330,7 +362,23 @@ export default function AdminDashboardPage() {
                         )}
                       </button>
                     </TableHead>
-                    <TableHead>登録日</TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('created_at')}
+                        className="flex items-center space-x-1 hover:text-primary"
+                      >
+                        <span>登録日</span>
+                        {sortField === 'created_at' ? (
+                          sortOrder === 'desc' ? (
+                            <ArrowDown className="w-4 h-4" />
+                          ) : (
+                            <ArrowUp className="w-4 h-4" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="w-4 h-4 opacity-50" />
+                        )}
+                      </button>
+                    </TableHead>
                     <TableHead>ステータス</TableHead>
                     <TableHead>操作</TableHead>
                   </TableRow>
@@ -533,4 +581,5 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+
 
