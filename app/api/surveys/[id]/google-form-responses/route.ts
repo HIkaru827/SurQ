@@ -56,13 +56,16 @@ export async function GET(
     )
     const snapshot = await getDocs(responsesQuery)
     
-    const responses = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      last_opened_at: doc.data().last_opened_at?.toDate?.()?.toISOString() || doc.data().last_opened_at,
-      completed_at: doc.data().completed_at?.toDate?.()?.toISOString() || doc.data().completed_at,
-      created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at,
-    }))
+    const responses = snapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        last_opened_at: data.last_opened_at?.toDate?.()?.toISOString() || data.last_opened_at,
+        completed_at: data.completed_at?.toDate?.()?.toISOString() || data.completed_at,
+        created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+      }
+    })
 
     return NextResponse.json({ responses })
   } catch (error) {

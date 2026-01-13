@@ -96,7 +96,7 @@ export async function POST(
         console.log('Updating existing user surveys_answered')
         
         await updateDoc(doc(db, 'users', userDoc.id), {
-          surveys_answered: (userDoc.data().surveys_answered || 0) + 1,
+          surveys_answered: increment(1),
           updated_at: serverTimestamp()
         })
         
@@ -108,9 +108,9 @@ export async function POST(
           name: respondent_name || 'Anonymous User',
           email: respondent_email,
           // points: 廃止
+          // level: 廃止
           surveys_answered: 1,
           surveys_created: 0,
-          level: 1,
           badges: [],
           created_at: serverTimestamp(),
           updated_at: serverTimestamp()

@@ -51,12 +51,15 @@ export async function GET(request: NextRequest) {
     }
     
     const snapshot = await getDocs(reportsQuery)
-    const reports = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      created_at: doc.data().created_at?.toDate?.()?.toISOString() || doc.data().created_at,
-      updated_at: doc.data().updated_at?.toDate?.()?.toISOString() || doc.data().updated_at,
-    }))
+    const reports = snapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+        updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+      }
+    })
 
     // 作成日時で降順ソート
     reports.sort((a, b) => {
