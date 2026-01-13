@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     
     const snapshot = await getDocs(reportsQuery)
     const reports = snapshot.docs.map(doc => {
-      const data = doc.data()
+      const data = doc.data() as any
       return {
         id: doc.id,
         ...data,

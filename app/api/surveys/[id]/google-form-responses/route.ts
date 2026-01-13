@@ -57,7 +57,7 @@ export async function GET(
     const snapshot = await getDocs(responsesQuery)
     
     const responses = snapshot.docs.map(doc => {
-      const data = doc.data()
+      const data = doc.data() as any
       return {
         id: doc.id,
         ...data,
