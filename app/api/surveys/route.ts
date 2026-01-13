@@ -111,17 +111,29 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const validatedData = validateInput(SurveySchema, body)
     console.log('Validated data:', JSON.stringify(validatedData, null, 2))
 
-    const surveyData = {
+    const surveyData: any = {
+      type: validatedData.type || 'native', // デフォルトはネイティブ形式（既存データとの互換性）
       title: validatedData.title,
       description: validatedData.description || null,
       creator_id: user.uid, // Use authenticated user's UID
-      questions: validatedData.questions || [],
       is_published: validatedData.is_published || false,
-      // respondent_points: 廃止
-      // creator_points: 廃止
       response_count: 0,
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
+    }
+
+    // ネイティブ形式の場合
+    if (validatedData.type === 'native' || !validatedData.type) {
+      surveyData.questions = validatedData.questions || []
+    }
+
+    // Googleフォーム形式の場合
+    if (validatedData.type === 'google_form') {
+      surveyData.google_form_url = validatedData.google_form_url
+      surveyData.embedded_url = validatedData.embedded_url
+      surveyData.estimated_time = validatedData.estimated_time
+      surveyData.category = validatedData.category
+      surveyData.target_audience = validatedData.target_audience || null
     }
 
     // 公開時はユーザーの投稿権をチェック・消費（開発者アカウントはスキップ）

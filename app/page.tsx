@@ -447,7 +447,7 @@ export default function LandingPage() {
                   </Link>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  © 2025 SurQ. All rights reserved.
+                  © 2026 SurQ. All rights reserved.
                 </p>
               </div>
             </div>

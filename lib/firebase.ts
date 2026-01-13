@@ -94,14 +94,23 @@ export function calculateAvailablePosts(surveys_answered: number, surveys_create
 
 export interface Survey {
   id: string
+  type: 'native' | 'google_form' // アンケート形式
   title: string
   description: string | null
   creator_id: string
-  questions: any
+  
+  // ネイティブ形式用
+  questions?: any
+  
+  // Googleフォーム形式用
+  google_form_url?: string
+  embedded_url?: string
+  estimated_time?: number // 所要時間（分）
+  category?: string
+  target_audience?: string
+  
   is_published: boolean
   response_count: number
-  // respondent_points: number // 廃止
-  // creator_points: number // 廃止
   created_at: string
   updated_at: string
 }
@@ -120,4 +129,41 @@ export interface UserAchievement {
   achievement_type: string
   achievement_data: any
   earned_at: string
+}
+
+// Googleフォーム回答追跡
+export interface GoogleFormResponse {
+  id: string
+  survey_id: string
+  user_id: string
+  user_name: string
+  user_email: string
+  last_opened_at: string // 最後に「回答する」をクリックした時刻
+  completed_at: string // 「回答しました」をクリックした時刻
+  open_count: number // 「回答する」を押した回数
+  estimated_duration_minutes: number // 所要時間（参考値）
+  is_reported: boolean
+  created_at: string
+}
+
+// 通報
+export interface Report {
+  id: string
+  survey_id: string
+  survey_title: string
+  reporter_id: string
+  reporter_name: string
+  reported_user_id: string
+  reported_user_name: string
+  reason: string
+  details: string
+  status: 'pending' | 'investigating' | 'resolved' | 'dismissed'
+  admin_notes?: string
+  response_data?: {
+    last_opened_at: string
+    completed_at: string
+    estimated_duration_minutes: number
+  }
+  created_at: string
+  updated_at: string
 }

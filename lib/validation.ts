@@ -22,17 +22,35 @@ export const QuestionSchema = z.object({
 
 // Survey validation schema
 export const SurveySchema = z.object({
+  type: z.enum(['native', 'google_form'], {
+    errorMap: () => ({ message: '無効なアンケート形式です' })
+  }).optional().default('native'),
   title: z.string().min(1, 'タイトルは必須です').max(200, 'タイトルは200文字以内で入力してください'),
   description: z.string().max(1000, '説明は1000文字以内で入力してください').optional().nullable(),
-  questions: z.array(QuestionSchema).max(50, '質問は50個以内で作成してください'),
-  // respondent_points: z.number().min(0).max(1000, '回答者ポイントは1000以下である必要があります').optional().default(0), // 廃止
-  // creator_points: z.number().min(0).optional().default(0), // 廃止
+  
+  // ネイティブ形式用
+  questions: z.array(QuestionSchema).max(50, '質問は50個以内で作成してください').optional(),
+  
+  // Googleフォーム形式用
+  google_form_url: z.string().url('有効なURLを入力してください').optional(),
+  embedded_url: z.string().url('有効なURLを入力してください').optional(),
+  estimated_time: z.number().int().min(1).max(60).optional(),
+  category: z.string().max(100).optional(),
+  target_audience: z.string().max(200).optional().nullable(),
+  
   is_published: z.boolean().optional().default(false)
 }).refine((data) => {
-  // 公開時は質問が必須、下書き時は不要
-  return !data.is_published || data.questions.length > 0
+  // ネイティブ形式の場合：公開時は質問が必須
+  if (data.type === 'native' || !data.type) {
+    return !data.is_published || (data.questions && data.questions.length > 0)
+  }
+  // Googleフォーム形式の場合：google_form_urlが必須
+  if (data.type === 'google_form') {
+    return !!data.google_form_url && !!data.category
+  }
+  return true
 }, {
-  message: '公開するには質問が少なくとも1つ必要です',
+  message: 'ネイティブ形式は質問が必要、Googleフォーム形式はURLとカテゴリーが必要です',
   path: ['questions']
 })
 

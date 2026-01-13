@@ -256,7 +256,7 @@ export default function LandingPage() {
               </Link>
             </div>
             <p className="text-muted-foreground">
-              © 2025 SurQ. 無料で使えるアンケートプラットフォーム
+              © 2026 SurQ. 無料で使えるアンケートプラットフォーム
             </p>
           </div>
         </div>

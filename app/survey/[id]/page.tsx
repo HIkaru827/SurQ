@@ -9,70 +9,55 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, ArrowRight, Trophy, Star, CheckCircle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ArrowLeft, ArrowRight, Trophy, Star, CheckCircle, ExternalLink, Clock, Info } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { toast } from "sonner"
 import { surveyEvents } from "@/lib/analytics"
+import { authenticatedFetch } from "@/lib/api-client"
 
-// Mock survey data
-const mockSurvey = {
-  id: "1",
-  title: "カフェの利用体験に関するアンケート",
-  description: "あなたのカフェ利用体験について教えてください",
-  questions: [
-    {
-      id: 1,
-      type: "multiple-choice",
-      question: "どのくらいの頻度でカフェを利用しますか？",
-      options: ["毎日", "週に2-3回", "週に1回", "月に数回", "ほとんど利用しない"],
-    },
-    {
-      id: 2,
-      type: "rating",
-      question: "当店のサービスに満足していますか？",
-      scale: 5,
-    },
-    {
-      id: 3,
-      type: "multiple-choice",
-      question: "最も重視するポイントは何ですか？",
-      options: ["コーヒーの味", "価格", "雰囲気", "立地", "Wi-Fi環境"],
-    },
-    {
-      id: 4,
-      type: "text",
-      question: "改善してほしい点があれば教えてください",
-    },
-    {
-      id: 5,
-      type: "multiple-choice",
-      question: "また利用したいと思いますか？",
-      options: ["ぜひ利用したい", "機会があれば利用したい", "どちらでもない", "あまり利用したくない", "利用したくない"],
-    },
-  ],
-  pointsReward: 50,
+interface Survey {
+  id: string
+  type: 'native' | 'google_form'
+  title: string
+  description?: string | null
+  questions?: any[]
+  response_count: number
+  google_form_url?: string
+  embedded_url?: string
+  estimated_time?: number
+  category?: string
+  target_audience?: string
+  creator_id: string
 }
 
 export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
   const { user } = useAuth()
+  const [surveyId, setSurveyId] = useState<string>('')
+  const [survey, setSurvey] = useState<Survey | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [hasAlreadyAnswered, setHasAlreadyAnswered] = useState(false)
+
+  // ネイティブ形式用の状態
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [isCompleted, setIsCompleted] = useState(false)
   const [showCompletion, setShowCompletion] = useState(false)
-  const [survey, setSurvey] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [surveyId, setSurveyId] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
   const [responseStartTime, setResponseStartTime] = useState<number>(Date.now())
-  const [hasAlreadyAnswered, setHasAlreadyAnswered] = useState(false)
   const [respondentName, setRespondentName] = useState('')
   const [respondentEmail, setRespondentEmail] = useState('')
   const [showUserForm, setShowUserForm] = useState(false)
   const [showSurveyInfo, setShowSurveyInfo] = useState(true)
   const [surveyStarted, setSurveyStarted] = useState(false)
+
+  // Googleフォーム用の状態
+  const [googleFormOpened, setGoogleFormOpened] = useState(false)
+  const [googleFormStartTime, setGoogleFormStartTime] = useState<string | null>(null)
+  const [confirmingCompletion, setConfirmingCompletion] = useState(false)
 
   useEffect(() => {
     const getParams = async () => {
@@ -129,6 +114,119 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     }
   }
 
+  // Googleフォームを開く（クリック追跡）
+  const handleOpenGoogleForm = async () => {
+    if (!user?.email || !survey) return
+
+    const startTime = new Date().toISOString()
+    setGoogleFormStartTime(startTime)
+    setGoogleFormOpened(true)
+
+    try {
+      // クリック追跡APIを呼び出す
+      await authenticatedFetch(`/api/surveys/${surveyId}/google-form-responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          started_at: startTime,
+        }),
+      })
+
+      // Googleフォームを新しいタブで開く
+      window.open(survey.google_form_url, '_blank')
+    } catch (error) {
+      console.error('Error tracking form open:', error)
+      toast.error('エラーが発生しました')
+    }
+  }
+
+  // 回答完了を報告
+  const handleConfirmCompletion = async () => {
+    if (!user?.email || !survey || !googleFormStartTime) return
+
+    setConfirmingCompletion(true)
+
+    try {
+      const response = await authenticatedFetch(`/api/surveys/${surveyId}/google-form-responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'complete',
+          started_at: googleFormStartTime,
+          completed_at: new Date().toISOString(),
+        }),
+      })
+
+      if (response.ok) {
+        toast.success('回答が記録されました！')
+        setIsCompleted(true)
+        setTimeout(() => setShowCompletion(true), 500)
+        
+        // キャッシュをクリア
+        sessionStorage.removeItem('cached_surveys')
+        sessionStorage.removeItem('cached_surveys_time')
+        if (user?.uid) {
+          sessionStorage.removeItem(`profile_${user.uid}`)
+        }
+      } else {
+        const data = await response.json()
+        toast.error(data.error || '回答の記録に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error confirming completion:', error)
+      toast.error('回答の記録に失敗しました')
+    } finally {
+      setConfirmingCompletion(false)
+    }
+  }
+
+  // ネイティブ形式の回答送信
+  const submitNativeSurvey = async () => {
+    if (!respondentEmail || !respondentName) {
+      toast.error('回答者情報が不足しています')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const response = await fetch(`/api/surveys/${surveyId}/responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          responses: answers,
+          respondent_email: respondentEmail,
+          respondent_name: respondentName,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        const responseTime = Date.now() - responseStartTime
+        surveyEvents.submitResponse(surveyId, responseTime)
+        
+        setIsCompleted(true)
+        setTimeout(() => setShowCompletion(true), 500)
+        toast.success('アンケートを送信しました！')
+        
+        // キャッシュをクリア
+        sessionStorage.removeItem('cached_surveys')
+        sessionStorage.removeItem('cached_surveys_time')
+        if (user?.uid) {
+          sessionStorage.removeItem(`profile_${user.uid}`)
+        }
+      } else {
+        toast.error(data.error || 'アンケートの送信に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error submitting survey:', error)
+      toast.error('アンケートの送信に失敗しました')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -156,7 +254,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     )
   }
 
-  // Show message if user has already answered
+  // 回答済みの場合
   if (hasAlreadyAnswered) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -171,9 +269,6 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
               <Link href="/app">
                 <Button className="w-full">アプリに戻る</Button>
               </Link>
-              <Link href="/profile?tab=answered">
-                <Button variant="outline" className="w-full">回答履歴を見る</Button>
-              </Link>
             </div>
           </CardContent>
         </Card>
@@ -181,183 +276,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     )
   }
 
-  // Show survey info page before starting
-  if (showSurveyInfo && !surveyStarted) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8 max-w-2xl">
-          <div className="mb-6">
-            <Link href="/app">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                戻る
-              </Button>
-            </Link>
-          </div>
-
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-2xl">{survey.title}</CardTitle>
-              {survey.description && (
-                <p className="text-muted-foreground mt-2">{survey.description}</p>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-muted/30 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-primary">{survey.questions.length}</div>
-                  <div className="text-sm text-muted-foreground">質問数</div>
-                </div>
-                <div className="bg-muted/30 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-primary">{survey.response_count || 0}</div>
-                  <div className="text-sm text-muted-foreground">回答数</div>
-                </div>
-                <div className="bg-muted/30 p-4 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-primary">~{Math.ceil(survey.questions.length * 0.5)}</div>
-                  <div className="text-sm text-muted-foreground">予想時間（分）</div>
-                </div>
-              </div>
-
-              <div className="text-center space-y-4">
-                <div className="flex items-center justify-center space-x-2 text-primary">
-                  <Trophy className="w-5 h-5" />
-                  <span className="font-medium">4回答で投稿権+1回！</span>
-                </div>
-                
-                <Button 
-                  size="lg" 
-                  className="w-full"
-                  onClick={() => {
-                    setShowSurveyInfo(false)
-                    setSurveyStarted(true)
-                  }}
-                >
-                  アンケートを開始
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
-  const totalQuestions = survey.questions.length
-  const progress = ((currentQuestion + 1) / totalQuestions) * 100
-
-  const handleAnswer = (questionId: string, answer: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: answer }))
-  }
-
-  const handleStartSurvey = () => {
-    if (!respondentEmail || !respondentName) {
-      toast.error('名前とメールアドレスを入力してください')
-      return
-    }
-    setShowUserForm(false)
-    setShowSurveyInfo(false)
-    setSurveyStarted(true)
-  }
-
-  const submitSurvey = async () => {
-    if (!respondentEmail || !respondentName) {
-      toast.error('回答者情報が不足しています')
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      console.log('Submitting survey response:', {
-        surveyId,
-        respondentEmail,
-        respondentName,
-        answers
-      })
-      
-      const response = await fetch(`/api/surveys/${surveyId}/responses`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          responses: answers,
-          respondent_email: respondentEmail,
-          respondent_name: respondentName,
-        }),
-      })
-
-      const data = await response.json()
-      console.log('Survey submission response:', data)
-
-      if (response.ok && data.success) {
-        const responseTime = Date.now() - responseStartTime
-        surveyEvents.submitResponse(surveyId, responseTime)
-        surveyEvents.earnPoints(data.points_earned, 'survey_response')
-        
-        setIsCompleted(true)
-        setTimeout(() => setShowCompletion(true), 500)
-        toast.success(`アンケートを送信しました！${data.points_earned}ポイント獲得！`)
-        
-        // キャッシュをクリアしてアプリページでの表示を更新
-        sessionStorage.removeItem('cached_surveys')
-        sessionStorage.removeItem('cached_surveys_time')
-        if (user?.uid) {
-          sessionStorage.removeItem(`profile_${user.uid}`)
-        }
-      } else {
-        toast.error(data.error || 'アンケートの送信に失敗しました')
-      }
-    } catch (error) {
-      console.error('Error submitting survey:', error)
-      toast.error('アンケートの送信に失敗しました')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleNext = () => {
-    if (currentQuestion < totalQuestions - 1) {
-      setCurrentQuestion((prev) => prev + 1)
-    } else {
-      // Complete survey
-      submitSurvey()
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion((prev) => prev - 1)
-    }
-  }
-
-  const currentQ = survey.questions[currentQuestion]
-  const currentAnswer = answers[currentQ?.id]
-  const canProceed = (() => {
-    if (!currentAnswer || currentAnswer === "") return false
-    
-    // Multiple selection questions
-    if ((currentQ as any)?.allowMultiple && currentAnswer.includes('__SEPARATOR__')) {
-      const parts = currentAnswer.split('__SEPARATOR__')
-      const selectedOptions = parts.filter(item => item.startsWith('__selected__:'))
-      const otherPart = parts.find(item => item.startsWith('__other__:'))
-      
-      // Need at least one selected option or a valid other answer
-      if (selectedOptions.length === 0 && !otherPart) return false
-      
-      // If other is selected, it needs text
-      if (otherPart && otherPart.replace('__other__:', '').trim() === '') return false
-      
-      return true
-    }
-    
-    // Single selection questions with "other" option
-    if (currentAnswer.startsWith('__other__:')) {
-      return currentAnswer.replace('__other__:', '').trim() !== ''
-    }
-    
-    return true
-  })()
-
+  // 完了画面
   if (isCompleted) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -394,11 +313,239 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     )
   }
 
-  // Show user information form for anonymous users
+  // Googleフォーム形式の表示
+  if (survey.type === 'google_form') {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          {/* ヘッダー */}
+          <div className="mb-6">
+            <Link href="/app">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                戻る
+              </Button>
+            </Link>
+          </div>
+
+          {/* アンケート情報 */}
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="default">Googleフォーム</Badge>
+                    {survey.category && (
+                      <Badge variant="outline">{survey.category}</Badge>
+                    )}
+                  </div>
+                  <CardTitle className="text-2xl mb-2">{survey.title}</CardTitle>
+                  {survey.description && (
+                    <p className="text-muted-foreground">{survey.description}</p>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* 情報カード */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {survey.estimated_time && (
+                  <div className="bg-muted/30 p-4 rounded-lg text-center">
+                    <Clock className="w-5 h-5 mx-auto mb-1 text-primary" />
+                    <div className="text-lg font-bold">{survey.estimated_time}分</div>
+                    <div className="text-xs text-muted-foreground">所要時間</div>
+                  </div>
+                )}
+                <div className="bg-muted/30 p-4 rounded-lg text-center">
+                  <Trophy className="w-5 h-5 mx-auto mb-1 text-primary" />
+                  <div className="text-lg font-bold">{survey.response_count || 0}</div>
+                  <div className="text-xs text-muted-foreground">回答数</div>
+                </div>
+                {survey.target_audience && (
+                  <div className="bg-muted/30 p-4 rounded-lg text-center col-span-2">
+                    <div className="text-sm font-medium">対象者</div>
+                    <div className="text-xs text-muted-foreground">{survey.target_audience}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* 回答フロー */}
+              {!googleFormOpened ? (
+                <div className="space-y-4">
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                      「回答する」ボタンをクリックすると、Googleフォームが新しいタブで開きます。
+                      回答後、このページに戻って「回答しました」ボタンをクリックしてください。
+                    </AlertDescription>
+                  </Alert>
+
+                  <Button 
+                    size="lg" 
+                    className="w-full"
+                    onClick={handleOpenGoogleForm}
+                    disabled={!user}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Googleフォームで回答する
+                  </Button>
+
+                  {!user && (
+                    <p className="text-sm text-center text-muted-foreground">
+                      回答するにはログインが必要です
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      Googleフォームが開きました。回答が完了したら、下のボタンをクリックしてください。
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="flex gap-3">
+                    <Button 
+                      size="lg" 
+                      variant="outline"
+                      className="flex-1"
+                      onClick={handleOpenGoogleForm}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      もう一度開く
+                    </Button>
+
+                    <Button 
+                      size="lg" 
+                      className="flex-1"
+                      onClick={handleConfirmCompletion}
+                      disabled={confirmingCompletion}
+                    >
+                      {confirmingCompletion ? (
+                        <>
+                          <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          処理中...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          回答しました
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      Googleフォームで回答を送信した後に「回答しました」ボタンを押してください。
+                      虚偽の報告は通報の対象となります。
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* プレビュー（iframe） */}
+          {survey.embedded_url && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">プレビュー</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="w-full" style={{ height: '600px' }}>
+                  <iframe
+                    src={survey.embedded_url}
+                    width="100%"
+                    height="100%"
+                    frameBorder="0"
+                    marginHeight={0}
+                    marginWidth={0}
+                    className="rounded-lg"
+                  >
+                    読み込んでいます…
+                  </iframe>
+                </div>
+                <p className="text-xs text-muted-foreground mt-4 text-center">
+                  ※ このプレビューは参考用です。実際の回答は新しいタブで行ってください。
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // 以下、ネイティブ形式の表示（既存のロジック）
+  // アンケート情報表示
+  if (showSurveyInfo && !surveyStarted) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <div className="mb-6">
+            <Link href="/app">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                戻る
+              </Button>
+            </Link>
+          </div>
+
+          <Card className="mb-6">
+            <CardHeader>
+              <Badge variant="outline" className="w-fit mb-2">従来形式</Badge>
+              <CardTitle className="text-2xl">{survey.title}</CardTitle>
+              {survey.description && (
+                <p className="text-muted-foreground mt-2">{survey.description}</p>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-muted/30 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-primary">{survey.questions?.length || 0}</div>
+                  <div className="text-sm text-muted-foreground">質問数</div>
+                </div>
+                <div className="bg-muted/30 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-primary">{survey.response_count || 0}</div>
+                  <div className="text-sm text-muted-foreground">回答数</div>
+                </div>
+                <div className="bg-muted/30 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-primary">~{Math.ceil((survey.questions?.length || 0) * 0.5)}</div>
+                  <div className="text-sm text-muted-foreground">予想時間（分）</div>
+                </div>
+              </div>
+
+              <div className="text-center space-y-4">
+                <div className="flex items-center justify-center space-x-2 text-primary">
+                  <Trophy className="w-5 h-5" />
+                  <span className="font-medium">4回答で投稿権+1回！</span>
+                </div>
+                
+                <Button 
+                  size="lg" 
+                  className="w-full"
+                  onClick={() => {
+                    setShowSurveyInfo(false)
+                    setSurveyStarted(true)
+                  }}
+                >
+                  アンケートを開始
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  // ユーザー情報入力フォーム（未ログインユーザー用）
   if (showUserForm) {
     return (
       <div className="min-h-screen bg-background">
-        {/* Header */}
         <header className="border-b border-border bg-background/95 backdrop-blur">
           <div className="container mx-auto px-4 py-3 sm:py-4">
             <div className="flex items-center justify-between">
@@ -412,12 +559,11 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
                 <h1 className="font-semibold text-foreground text-sm sm:text-base line-clamp-1">{survey.title}</h1>
                 <p className="text-xs sm:text-sm text-muted-foreground">回答者情報の入力</p>
               </div>
-              <div className="w-16" /> {/* Spacer for centering */}
+              <div className="w-16" />
             </div>
           </div>
         </header>
 
-        {/* User Form */}
         <main className="container mx-auto px-4 py-6 sm:py-8 max-w-2xl">
           <Card className="border-0 shadow-lg">
             <CardHeader className="p-4 sm:p-6">
@@ -452,7 +598,15 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
 
               <div className="pt-2 sm:pt-4">
                 <Button 
-                  onClick={handleStartSurvey}
+                  onClick={() => {
+                    if (!respondentEmail || !respondentName) {
+                      toast.error('名前とメールアドレスを入力してください')
+                      return
+                    }
+                    setShowUserForm(false)
+                    setShowSurveyInfo(false)
+                    setSurveyStarted(true)
+                  }}
                   disabled={!respondentEmail || !respondentName}
                   className="w-full h-10 sm:h-11 text-sm sm:text-base"
                 >
@@ -466,9 +620,54 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     )
   }
 
+  // ネイティブ形式のアンケート回答画面
+  const totalQuestions = survey.questions?.length || 0
+  const progress = ((currentQuestion + 1) / totalQuestions) * 100
+  const currentQ = survey.questions?.[currentQuestion]
+  const currentAnswer = answers[currentQ?.id]
+
+  const canProceed = (() => {
+    if (!currentAnswer || currentAnswer === "") return false
+    
+    if ((currentQ as any)?.allowMultiple && currentAnswer.includes('__SEPARATOR__')) {
+      const parts = currentAnswer.split('__SEPARATOR__')
+      const selectedOptions = parts.filter(item => item.startsWith('__selected__:'))
+      const otherPart = parts.find(item => item.startsWith('__other__:'))
+      
+      if (selectedOptions.length === 0 && !otherPart) return false
+      if (otherPart && otherPart.replace('__other__:', '').trim() === '') return false
+      
+      return true
+    }
+    
+    if (currentAnswer.startsWith('__other__:')) {
+      return currentAnswer.replace('__other__:', '').trim() !== ''
+    }
+    
+    return true
+  })()
+
+  const handleAnswer = (questionId: string, answer: string) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: answer }))
+  }
+
+  const handleNext = () => {
+    if (currentQuestion < totalQuestions - 1) {
+      setCurrentQuestion((prev) => prev + 1)
+    } else {
+      submitNativeSurvey()
+    }
+  }
+
+  const handlePrevious = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion((prev) => prev - 1)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* ヘッダー */}
       <header className="border-b border-border bg-background/95 backdrop-blur">
         <div className="container mx-auto px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between">
@@ -484,164 +683,78 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
                 {currentQuestion + 1} / {totalQuestions}
               </p>
             </div>
-            <div className="w-16" /> {/* Spacer for centering */}
+            <div className="w-16" />
           </div>
         </div>
       </header>
 
-      {/* Progress Bar */}
+      {/* プログレスバー */}
       <div className="container mx-auto px-4 py-3 sm:py-4">
         <Progress value={progress} className="h-2" />
       </div>
 
-      {/* Question Content */}
+      {/* 質問コンテンツ */}
       <main className="container mx-auto px-4 py-6 sm:py-8 max-w-2xl">
         <Card className="border-0 shadow-lg">
           <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-lg sm:text-xl text-balance leading-tight">{currentQ.question}</CardTitle>
+            <CardTitle className="text-lg sm:text-xl text-balance leading-tight">{currentQ?.question}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0">
-            {/* Multiple Choice Questions */}
-            {currentQ.type === "multiple-choice" && (
+            {/* 複数選択 */}
+            {currentQ?.type === "multiple-choice" && (
               <div className="space-y-3">
-                {(currentQ as any).allowMultiple ? (
-                  // Checkbox mode for multiple selection
-                  <div className="space-y-3">
-                    {currentQ.options?.map((option: string, index: number) => {
-                      const isChecked = currentAnswer?.includes(`__selected__:${option}`) || false
-                      return (
-                        <div
-                          key={index}
-                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            id={`option-${index}`}
-                            checked={isChecked}
-                            onChange={(e) => {
-                              const selectedOptions = currentAnswer ? currentAnswer.split('__SEPARATOR__').filter(item => item.startsWith('__selected__:')) : []
-                              const otherAnswer = currentAnswer?.split('__SEPARATOR__').find(item => item.startsWith('__other__:')) || ''
-                              
-                              if (e.target.checked) {
-                                selectedOptions.push(`__selected__:${option}`)
-                              } else {
-                                const optionIndex = selectedOptions.indexOf(`__selected__:${option}`)
-                                if (optionIndex > -1) {
-                                  selectedOptions.splice(optionIndex, 1)
-                                }
-                              }
-                              
-                              const newAnswer = [...selectedOptions, ...(otherAnswer ? [otherAnswer] : [])].join('__SEPARATOR__')
-                              handleAnswer(currentQ.id, newAnswer)
-                            }}
-                            className="rounded border-border"
-                          />
-                          <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
-                            {option}
-                          </Label>
-                        </div>
-                      )
-                    })}
-                    
-                    {(currentQ as any).allowOther && (
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                          <input
-                            type="checkbox"
-                            id="other-option"
-                            checked={currentAnswer?.includes('__other__:') || false}
-                            onChange={(e) => {
-                              const selectedOptions = currentAnswer ? currentAnswer.split('__SEPARATOR__').filter(item => item.startsWith('__selected__:')) : []
-                              
-                              if (e.target.checked) {
-                                const newAnswer = [...selectedOptions, '__other__:'].join('__SEPARATOR__')
-                                handleAnswer(currentQ.id, newAnswer)
-                              } else {
-                                const newAnswer = selectedOptions.join('__SEPARATOR__')
-                                handleAnswer(currentQ.id, newAnswer)
-                              }
-                            }}
-                            className="rounded border-border"
-                          />
-                          <Label htmlFor="other-option" className="cursor-pointer text-base">
-                            その他
-                          </Label>
-                        </div>
-                        
-                        {currentAnswer?.includes('__other__:') && (
-                          <div className="ml-8">
-                            <Input
-                              placeholder="具体的に入力してください"
-                              value={currentAnswer.split('__SEPARATOR__').find(item => item.startsWith('__other__:'))?.replace('__other__:', '') || ''}
-                              onChange={(e) => {
-                                const selectedOptions = currentAnswer ? currentAnswer.split('__SEPARATOR__').filter(item => item.startsWith('__selected__:')) : []
-                                const newOtherValue = e.target.value ? `__other__:${e.target.value}` : ''
-                                const newAnswer = [...selectedOptions, ...(newOtherValue ? [newOtherValue] : [])].join('__SEPARATOR__')
-                                handleAnswer(currentQ.id, newAnswer)
-                              }}
-                              className="text-base"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  // Radio button mode for single selection
-                  <RadioGroup
-                    value={currentAnswer?.startsWith('__other__:') ? '__other__' : currentAnswer}
-                    onValueChange={(value) => {
-                      if (value === '__other__') {
-                        // "その他" was selected, keep existing custom text if any
-                        if (!currentAnswer?.startsWith('__other__:')) {
-                          handleAnswer(currentQ.id, '__other__:')
-                        }
-                      } else {
-                        handleAnswer(currentQ.id, value)
+                <RadioGroup
+                  value={currentAnswer?.startsWith('__other__:') ? '__other__' : currentAnswer}
+                  onValueChange={(value) => {
+                    if (value === '__other__') {
+                      if (!currentAnswer?.startsWith('__other__:')) {
+                        handleAnswer(currentQ.id, '__other__:')
                       }
-                    }}
-                    className="space-y-3"
-                  >
-                    {currentQ.options?.map((option: string, index: number) => (
-                      <div
-                        key={index}
-                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                      >
-                        <RadioGroupItem value={option} id={`option-${index}`} />
-                        <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
-                          {option}
+                    } else {
+                      handleAnswer(currentQ.id, value)
+                    }
+                  }}
+                  className="space-y-3"
+                >
+                  {currentQ.options?.map((option: string, index: number) => (
+                    <div
+                      key={index}
+                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <RadioGroupItem value={option} id={`option-${index}`} />
+                      <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer text-base">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                  
+                  {(currentQ as any).allowOther && (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                        <RadioGroupItem value="__other__" id="other-option" />
+                        <Label htmlFor="other-option" className="cursor-pointer text-base">
+                          その他
                         </Label>
                       </div>
-                    ))}
-                    
-                    {(currentQ as any).allowOther && (
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                          <RadioGroupItem value="__other__" id="other-option" />
-                          <Label htmlFor="other-option" className="cursor-pointer text-base">
-                            その他
-                          </Label>
+                      
+                      {currentAnswer?.startsWith('__other__:') && (
+                        <div className="ml-8">
+                          <Input
+                            placeholder="具体的に入力してください"
+                            value={currentAnswer.replace('__other__:', '')}
+                            onChange={(e) => handleAnswer(currentQ.id, '__other__:' + e.target.value)}
+                            className="text-base"
+                          />
                         </div>
-                        
-                        {currentAnswer?.startsWith('__other__:') && (
-                          <div className="ml-8">
-                            <Input
-                              placeholder="具体的に入力してください"
-                              value={currentAnswer.replace('__other__:', '')}
-                              onChange={(e) => handleAnswer(currentQ.id, '__other__:' + e.target.value)}
-                              className="text-base"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </RadioGroup>
-                )}
+                      )}
+                    </div>
+                  )}
+                </RadioGroup>
               </div>
             )}
 
-            {/* Yes/No Questions */}
-            {currentQ.type === "yes-no" && (
+            {/* はい/いいえ */}
+            {currentQ?.type === "yes-no" && (
               <RadioGroup
                 value={currentAnswer}
                 onValueChange={(value) => handleAnswer(currentQ.id, value)}
@@ -658,8 +771,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
               </RadioGroup>
             )}
 
-            {/* Rating Questions */}
-            {currentQ.type === "rating" && (
+            {/* 評価 */}
+            {currentQ?.type === "rating" && (
               <div className="space-y-4">
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>全く満足していない</span>
@@ -682,8 +795,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
               </div>
             )}
 
-            {/* Text Questions */}
-            {currentQ.type === "text" && (
+            {/* テキスト */}
+            {currentQ?.type === "text" && (
               <Textarea
                 placeholder="こちらにご意見をお聞かせください..."
                 value={currentAnswer || ""}
@@ -694,7 +807,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
           </CardContent>
         </Card>
 
-        {/* Navigation */}
+        {/* ナビゲーション */}
         <div className="flex justify-between items-center mt-6 sm:mt-8 gap-4">
           <Button
             variant="outline"

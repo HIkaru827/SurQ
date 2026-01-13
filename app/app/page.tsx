@@ -8,20 +8,22 @@ import { calculateAvailablePosts, answersUntilNextPost } from '@/lib/points'
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { BarChart3, Users, Trophy, Zap, ArrowRight, PlusCircle, MessageSquare, Star, User, Mail } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { BarChart3, Users, Trophy, Zap, ArrowRight, PlusCircle, MessageSquare, Star, User, Mail, Info } from "lucide-react"
 import Link from "next/link"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 
 interface Survey {
   id: string
+  type?: 'native' | 'google_form'
   title: string
   description: string | null
   creator_id: string
-  questions: any[]
+  questions?: any[]
   is_published: boolean
   response_count: number
-  // respondent_points: number // 廃止
-  // creator_points: number // 廃止
+  estimated_time?: number
+  category?: string
   created_at: string
   updated_at: string
   has_answered?: boolean
@@ -217,17 +219,25 @@ export default function AppPage() {
                 {userSurveys.map((survey) => (
                   <Card key={survey.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader className="pb-3 p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="text-sm sm:text-base lg:text-lg line-clamp-2 flex-1 leading-tight">
-                          {survey.title}
-                        </CardTitle>
-                        <Badge 
-                          variant={survey.is_published ? "default" : "secondary"}
-                          className="text-xs px-2 py-1 shrink-0"
-                        >
-                          {survey.is_published ? "公開中" : "下書き"}
-                        </Badge>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge 
+                            variant={survey.type === 'google_form' ? "default" : "outline"}
+                            className="text-xs px-2 py-1 shrink-0"
+                          >
+                            {survey.type === 'google_form' ? 'Googleフォーム' : '従来形式'}
+                          </Badge>
+                          <Badge 
+                            variant={survey.is_published ? "default" : "secondary"}
+                            className="text-xs px-2 py-1 shrink-0"
+                          >
+                            {survey.is_published ? "公開中" : "下書き"}
+                          </Badge>
+                        </div>
                       </div>
+                      <CardTitle className="text-sm sm:text-base lg:text-lg line-clamp-2 leading-tight">
+                        {survey.title}
+                      </CardTitle>
                       {survey.description && (
                         <p className="text-muted-foreground text-xs sm:text-sm line-clamp-2 mt-1">
                           {survey.description}
@@ -279,10 +289,23 @@ export default function AppPage() {
       {/* Published Surveys Section */}
       <section id="surveys" className="py-16 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto max-w-6xl">
+          {/* お知らせ */}
+          <Alert className="mb-8 border-blue-200 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong className="font-semibold">📢 重要なお知らせ</strong>
+              <br className="hidden sm:block" />
+              <span className="mt-1 inline-block">
+                新規アンケートの作成方法がGoogleフォーム形式に変更されました。
+                より簡単に投稿できるようになりました！既存のアンケートは引き続きご利用いただけます。
+              </span>
+            </AlertDescription>
+          </Alert>
+
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">公開中のアンケート</h2>
             <p className="text-xl text-muted-foreground mb-6">
-              回答してポイントを獲得しましょう！
+              4回答で1件投稿できます！
             </p>
             <Badge variant="secondary">{surveys.length}件のアンケート</Badge>
           </div>
@@ -312,6 +335,19 @@ export default function AppPage() {
               {surveys.slice(0, 6).map((survey) => (
                 <Card key={survey.id} className="hover:shadow-lg transition-shadow border-0 shadow-md">
                   <CardHeader className="pb-3 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge 
+                        variant={survey.type === 'google_form' ? "default" : "outline"}
+                        className="text-xs px-2 py-1"
+                      >
+                        {survey.type === 'google_form' ? 'Googleフォーム' : '従来形式'}
+                      </Badge>
+                      {survey.estimated_time && (
+                        <Badge variant="secondary" className="text-xs px-2 py-1">
+                          約{survey.estimated_time}分
+                        </Badge>
+                      )}
+                    </div>
                     <CardTitle className="text-base sm:text-lg line-clamp-2 leading-tight">{survey.title}</CardTitle>
                     {survey.description && (
                       <p className="text-muted-foreground text-xs sm:text-sm line-clamp-2 sm:line-clamp-3 mt-1">
@@ -322,20 +358,34 @@ export default function AppPage() {
                   <CardContent className="p-4 pt-0">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs sm:text-sm">
-                        <div className="flex items-center space-x-1 sm:space-x-2">
-                          <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
-                          <span>{survey.questions?.length || 0}問</span>
-                        </div>
-                        <div className="flex items-center space-x-1 sm:space-x-2">
-                          <Users className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
-                          <span>{survey.response_count}回答</span>
-                        </div>
+                        {survey.type === 'google_form' ? (
+                          <div className="flex items-center space-x-1 sm:space-x-2">
+                            <Users className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
+                            <span>{survey.response_count}回答</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center space-x-1 sm:space-x-2">
+                              <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
+                              <span>{survey.questions?.length || 0}問</span>
+                            </div>
+                            <div className="flex items-center space-x-1 sm:space-x-2">
+                              <Users className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
+                              <span>{survey.response_count}回答</span>
+                            </div>
+                          </>
+                        )}
                       </div>
                       
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <Badge variant="outline" className="text-xs px-2 py-1">
                           {formatDate(survey.created_at)}
                         </Badge>
+                        {survey.category && (
+                          <Badge variant="secondary" className="text-xs px-2 py-1">
+                            {survey.category}
+                          </Badge>
+                        )}
                       </div>
 
                       {survey.has_answered ? (

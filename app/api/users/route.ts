@@ -69,8 +69,6 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       email,
       name,
       avatar_url: null,
-      points: isDevAccount ? DEVELOPER_CONFIG.UNLIMITED_POINTS : 50,
-      level: isDevAccount ? 999 : 1,
       badges: [],
       surveys_created: 0,
       surveys_answered: 0,
