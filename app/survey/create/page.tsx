@@ -93,9 +93,7 @@ export default function CreateSurveyPage() {
   }
 
   // 投稿処理
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+  const handleSubmit = async (isPublished: boolean) => {
     if (!user?.email) {
       setError("ログインが必要です")
       return
@@ -127,16 +125,18 @@ export default function CreateSurveyPage() {
       return
     }
 
-    // 投稿権限チェック
-    const availablePosts = calculateAvailablePosts(
-      userProfile.surveys_answered,
-      userProfile.surveys_created
-    )
+    // 公開時のみ投稿権限チェック
+    if (isPublished) {
+      const availablePosts = calculateAvailablePosts(
+        userProfile.surveys_answered,
+        userProfile.surveys_created
+      )
 
-    if (availablePosts <= 0) {
-      const answersNeeded = answersUntilNextPost(userProfile.surveys_answered)
-      setError(`投稿するには、あと${answersNeeded}件のアンケートに回答してください`)
-      return
+      if (availablePosts <= 0) {
+        const answersNeeded = answersUntilNextPost(userProfile.surveys_answered)
+        setError(`投稿するには、あと${answersNeeded}件のアンケートに回答してください`)
+        return
+      }
     }
 
     setSubmitting(true)
@@ -152,7 +152,7 @@ export default function CreateSurveyPage() {
         estimated_time: estimatedTime,
         category: category,
         target_audience: targetAudience.trim() || null,
-        is_published: true,
+        is_published: isPublished,
       }
 
       const response = await authenticatedFetch("/api/surveys", {
@@ -169,7 +169,11 @@ export default function CreateSurveyPage() {
       const result = await response.json()
       
       // 成功したらリダイレクト
-      router.push(`/survey/${result.id}`)
+      if (isPublished) {
+        router.push(`/survey/${result.id}`)
+      } else {
+        router.push("/profile")
+      }
     } catch (error) {
       console.error("Error creating survey:", error)
       setError(error instanceof Error ? error.message : "アンケートの投稿に失敗しました")
@@ -267,7 +271,7 @@ export default function CreateSurveyPage() {
         )}
 
         {/* 投稿フォーム */}
-        <form onSubmit={handleSubmit}>
+        <div>
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>基本情報</CardTitle>
@@ -396,7 +400,31 @@ export default function CreateSurveyPage() {
             <Button type="button" variant="outline" asChild>
               <Link href="/profile">キャンセル</Link>
             </Button>
-            <Button type="submit" disabled={!canPost || submitting} size="lg">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => handleSubmit(false)}
+              disabled={submitting}
+              size="lg"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  下書き保存
+                </>
+              )}
+            </Button>
+            <Button 
+              type="button" 
+              onClick={() => handleSubmit(true)}
+              disabled={!canPost || submitting} 
+              size="lg"
+            >
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -410,7 +438,7 @@ export default function CreateSurveyPage() {
               )}
             </Button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )
