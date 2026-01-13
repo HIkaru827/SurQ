@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth"
 import { authenticatedFetch } from "@/lib/api-client"
 import { calculateAvailablePosts, answersUntilNextPost } from "@/lib/points"
@@ -25,6 +25,8 @@ interface UserProfile {
 export default function CreateSurveyPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('edit')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
@@ -65,6 +67,46 @@ export default function CreateSurveyPage() {
 
     fetchUserProfile()
   }, [user])
+
+  // 編集モード: 既存データの取得
+  useEffect(() => {
+    async function fetchSurveyData() {
+      if (!editId || !user) return
+
+      try {
+        const response = await authenticatedFetch(`/api/surveys/${editId}`)
+        if (!response.ok) throw new Error("アンケートの取得に失敗しました")
+        
+        const data = await response.json()
+        const survey = data.survey
+
+        // Googleフォーム形式のみ編集可能
+        if (survey.type !== 'google_form') {
+          setError("従来形式のアンケートは編集できません")
+          return
+        }
+
+        // 作成者チェック
+        if (survey.creator_id !== user.uid) {
+          setError("このアンケートを編集する権限がありません")
+          return
+        }
+
+        // フォームにデータを設定
+        setTitle(survey.title || "")
+        setDescription(survey.description || "")
+        setGoogleFormUrl(survey.google_form_url || "")
+        setEstimatedTime(survey.estimated_time || 5)
+        setCategory(survey.category || "")
+        setTargetAudience(survey.target_audience || "")
+      } catch (error) {
+        console.error("Error fetching survey:", error)
+        setError("アンケートの取得に失敗しました")
+      }
+    }
+
+    fetchSurveyData()
+  }, [editId, user])
 
   // GoogleフォームURLの埋め込み用URLへの変換
   const convertToEmbeddedUrl = (url: string): string => {
@@ -155,28 +197,42 @@ export default function CreateSurveyPage() {
         is_published: isPublished,
       }
 
-      const response = await authenticatedFetch("/api/surveys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(surveyData),
-      })
+      let response
+      let resultId
+
+      if (editId) {
+        // 編集モード: PUT
+        response = await authenticatedFetch(`/api/surveys/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(surveyData),
+        })
+        resultId = editId
+      } else {
+        // 新規作成モード: POST
+        response = await authenticatedFetch("/api/surveys", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(surveyData),
+        })
+        const result = await response.json()
+        resultId = result.id
+      }
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || "アンケートの投稿に失敗しました")
+        throw new Error(errorData.error || "アンケートの保存に失敗しました")
       }
-
-      const result = await response.json()
       
       // 成功したらリダイレクト
       if (isPublished) {
-        router.push(`/survey/${result.id}`)
+        router.push(`/survey/${resultId}`)
       } else {
         router.push("/profile")
       }
     } catch (error) {
-      console.error("Error creating survey:", error)
-      setError(error instanceof Error ? error.message : "アンケートの投稿に失敗しました")
+      console.error("Error saving survey:", error)
+      setError(error instanceof Error ? error.message : "アンケートの保存に失敗しました")
     } finally {
       setSubmitting(false)
     }
@@ -228,7 +284,9 @@ export default function CreateSurveyPage() {
                 </Link>
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">アンケートを投稿</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {editId ? "アンケートを編集" : "アンケートを投稿"}
+                </h1>
                 <p className="text-sm text-gray-600 mt-1">GoogleフォームのURLを入力してください</p>
               </div>
             </div>
