@@ -74,14 +74,14 @@ export async function GET(
   }
 }
 
-// POST: クリック追跡 & 回答完了報告
+// POST: クリック追跡 & 回答完了報告 & アクセス権限エラー報告
 export const POST = withAuth(async (request: NextRequest, user, context) => {
   try {
     const { id: surveyId } = await context.params
     const body = await request.json()
     const { action, started_at, completed_at } = body
 
-    if (!action || !['start', 'complete'].includes(action)) {
+    if (!action || !['start', 'complete', 'access_error'].includes(action)) {
       return createErrorResponse('無効なアクションです', 400)
     }
 
@@ -186,6 +186,30 @@ export const POST = withAuth(async (request: NextRequest, user, context) => {
         success: true,
         message: '回答を記録しました',
         duration_minutes: durationMinutes,
+      })
+    } else if (action === 'access_error') {
+      // 「見れません」ボタンクリック時 - アンケート作成者に通知
+      
+      // アンケート作成者の情報を取得
+      const creatorId = surveyData.creator_id
+      
+      // 通知を作成
+      await addDoc(collection(db, 'notifications'), {
+        user_id: creatorId,
+        type: 'system',
+        title: 'アンケートのアクセス権限エラー報告',
+        message: `あなたのアンケート「${surveyData.title}」が見れないという報告が届いています。Googleフォームの権限設定を確認してください。`,
+        survey_id: surveyId,
+        survey_title: surveyData.title,
+        is_read: false,
+        created_at: serverTimestamp(),
+      })
+
+      console.log(`Access error notification sent to creator: ${creatorId} for survey: ${surveyId}`)
+
+      return NextResponse.json({ 
+        success: true,
+        message: 'アクセス権限エラーを報告しました'
       })
     }
 

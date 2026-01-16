@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart3, Users, Trophy, Zap, ArrowRight, PlusCircle, MessageSquare, Star, User, Mail, Info } from "lucide-react"
 import Link from "next/link"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
@@ -34,6 +35,7 @@ export default function AppPage() {
   const [userSurveys, setUserSurveys] = useState<Survey[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [sortBy, setSortBy] = useState<'popular' | 'newest'>('newest')
   const { user, userProfile, refreshProfile } = useAuth()
   
   const isDevAccount = user?.email ? isDeveloperAccount(user.email) : false
@@ -166,6 +168,15 @@ export default function AppPage() {
       day: 'numeric'
     })
   }
+
+  // 並び替え処理
+  const sortedSurveys = [...surveys].sort((a, b) => {
+    if (sortBy === 'popular') {
+      return b.response_count - a.response_count
+    } else {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+  })
   
   return (
     <div className="min-h-screen bg-background">
@@ -307,7 +318,24 @@ export default function AppPage() {
             <p className="text-xl text-muted-foreground mb-6">
               4回答で1件投稿できます！
             </p>
-            <Badge variant="secondary">{surveys.length}件のアンケート</Badge>
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              <Badge variant="secondary">{surveys.length}件のアンケート</Badge>
+              
+              {!loading && surveys.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">並び替え:</span>
+                  <Select value={sortBy} onValueChange={(value: 'popular' | 'newest') => setSortBy(value)}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">新規順</SelectItem>
+                      <SelectItem value="popular">人気順</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
           </div>
 
           {loading ? (
@@ -332,7 +360,7 @@ export default function AppPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-              {surveys.slice(0, 6).map((survey) => (
+              {sortedSurveys.slice(0, 6).map((survey) => (
                 <Card key={survey.id} className="hover:shadow-lg transition-shadow border-0 shadow-md">
                   <CardHeader className="pb-3 p-4">
                     <div className="flex items-center gap-2 mb-2">

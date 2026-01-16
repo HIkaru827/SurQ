@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth'
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MessageSquare, Users, Star, Trophy, ArrowLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 
@@ -25,6 +26,7 @@ interface Survey {
 export default function SurveysPage() {
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [loading, setLoading] = useState(true)
+  const [sortBy, setSortBy] = useState<'popular' | 'newest'>('newest')
   const { user } = useAuth()
 
   useEffect(() => {
@@ -100,6 +102,15 @@ export default function SurveysPage() {
     })
   }
 
+  // 並び替え処理
+  const sortedSurveys = [...surveys].sort((a, b) => {
+    if (sortBy === 'popular') {
+      return b.response_count - a.response_count
+    } else {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+  })
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -133,9 +144,26 @@ export default function SurveysPage() {
           <p className="text-xl text-muted-foreground mb-4">
             回答してポイントを獲得しましょう！
           </p>
-          <Badge variant="secondary" className="text-base px-3 py-1">
-            {loading ? '読み込み中...' : `${surveys.length}件のアンケート`}
-          </Badge>
+          <div className="flex items-center gap-4 flex-wrap">
+            <Badge variant="secondary" className="text-base px-3 py-1">
+              {loading ? '読み込み中...' : `${surveys.length}件のアンケート`}
+            </Badge>
+            
+            {!loading && surveys.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">並び替え:</span>
+                <Select value={sortBy} onValueChange={(value: 'popular' | 'newest') => setSortBy(value)}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">新規順</SelectItem>
+                    <SelectItem value="popular">人気順</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
         </div>
 
         {loading ? (
@@ -160,7 +188,7 @@ export default function SurveysPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {surveys.map((survey) => (
+            {sortedSurveys.map((survey) => (
               <Card key={survey.id} className="hover:shadow-lg transition-shadow border-0 shadow-md">
                 <CardHeader className="pb-3 p-4">
                   <CardTitle className="text-base sm:text-lg line-clamp-2 leading-tight">
@@ -219,6 +247,7 @@ export default function SurveysPage() {
     </div>
   )
 }
+
 
 
 

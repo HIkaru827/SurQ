@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ArrowLeft, ArrowRight, Trophy, Star, CheckCircle, ExternalLink, Clock, Info } from "lucide-react"
+import { ArrowLeft, ArrowRight, Trophy, Star, CheckCircle, ExternalLink, Clock, Info, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
@@ -58,6 +58,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   const [googleFormOpened, setGoogleFormOpened] = useState(false)
   const [googleFormStartTime, setGoogleFormStartTime] = useState<string | null>(null)
   const [confirmingCompletion, setConfirmingCompletion] = useState(false)
+  const [reportingAccessError, setReportingAccessError] = useState(false)
 
   useEffect(() => {
     const getParams = async () => {
@@ -178,6 +179,35 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       toast.error('回答の記録に失敗しました')
     } finally {
       setConfirmingCompletion(false)
+    }
+  }
+
+  // アクセス権限エラーを報告
+  const handleReportAccessError = async () => {
+    if (!user?.email || !survey) return
+
+    setReportingAccessError(true)
+
+    try {
+      const response = await authenticatedFetch(`/api/surveys/${surveyId}/google-form-responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'access_error',
+        }),
+      })
+
+      if (response.ok) {
+        toast.success('アクセス権限の問題を投稿者に報告しました')
+      } else {
+        const data = await response.json()
+        toast.error(data.error || '報告に失敗しました')
+      }
+    } catch (error) {
+      console.error('Error reporting access error:', error)
+      toast.error('報告に失敗しました')
+    } finally {
+      setReportingAccessError(false)
     }
   }
 
@@ -443,6 +473,26 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
                       虚偽の報告は通報の対象となります。
                     </AlertDescription>
                   </Alert>
+
+                  <Button 
+                    size="lg" 
+                    variant="destructive"
+                    className="w-full"
+                    onClick={handleReportAccessError}
+                    disabled={reportingAccessError}
+                  >
+                    {reportingAccessError ? (
+                      <>
+                        <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        報告中...
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        見れません（リンクが開けない・権限がないなど）
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </CardContent>
