@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -54,7 +55,8 @@ import {
   Save,
   Send,
   Shield,
-  Mail
+  Mail,
+  AlertTriangle
 } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import {
@@ -84,6 +86,8 @@ interface Survey {
   // creator_points: number // 廃止
   created_at: string
   updated_at: string
+  expires_at?: string // 有効期限
+  last_extended_at?: string // 最後に延長した日時
 }
 
 interface UserProfile {
@@ -98,6 +102,8 @@ interface UserProfile {
   surveys_answered: number
   total_responses_received: number
   joined_at: string
+  last_answered_at?: string // 最後に回答した日時
+  last_survey_extended_at?: string // 最後にアンケート有効期限を延長した日時
 }
 
 interface AnsweredSurvey {
@@ -425,6 +431,78 @@ export default function ProfilePage() {
     }
   }, [])
 
+  // SEO対策: 構造化データ（JSON-LD）の追加
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // 既存の構造化データスクリプトを削除
+      const existingScript = document.querySelector('script[type="application/ld+json"][data-page="profile"]')
+      if (existingScript) {
+        existingScript.remove()
+      }
+
+      // BreadcrumbList スキーマ
+      const breadcrumbSchema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "ホーム",
+            "item": `${window.location.origin}/`
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "マイページ",
+            "item": `${window.location.origin}/profile`
+          }
+        ]
+      }
+
+      const script = document.createElement('script')
+      script.type = 'application/ld+json'
+      script.setAttribute('data-page', 'profile')
+      script.textContent = JSON.stringify(breadcrumbSchema)
+      document.head.appendChild(script)
+    }
+  }, [])
+
+  // ユーザー情報が読み込まれたら、より詳細な構造化データを追加
+  useEffect(() => {
+    if (typeof window !== 'undefined' && localProfile) {
+      const addUserStructuredData = () => {
+        // 既存のユーザー構造化データスクリプトを削除
+        const existingScript = document.querySelector('script[type="application/ld+json"][data-page="profile-user"]')
+        if (existingScript) {
+          existingScript.remove()
+        }
+
+        // ProfilePage スキーマ
+        const profileSchema = {
+          "@context": "https://schema.org",
+          "@type": "ProfilePage",
+          "name": `${localProfile.name}のマイページ`,
+          "description": "SurQでのアンケート活動の統計とプロフィール",
+          "mainEntity": {
+            "@type": "Person",
+            "name": localProfile.name,
+            "identifier": localProfile.id,
+            ...(localProfile.avatar_url && { "image": localProfile.avatar_url })
+          }
+        }
+
+        const script = document.createElement('script')
+        script.type = 'application/ld+json'
+        script.setAttribute('data-page', 'profile-user')
+        script.textContent = JSON.stringify(profileSchema)
+        document.head.appendChild(script)
+      }
+
+      addUserStructuredData()
+    }
+  }, [localProfile])
+
   const fetchUserData = async () => {
     try {
       // Auth contextからユーザーデータを使用（優先）
@@ -568,6 +646,68 @@ export default function ProfilePage() {
       month: 'long',
       day: 'numeric'
     })
+  }
+
+  // 有効期限までの残り日数を計算
+  const daysUntilExpiry = (expiryDate: string) => {
+    const now = new Date()
+    const expiry = new Date(expiryDate)
+    const diff = expiry.getTime() - now.getTime()
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  }
+
+  // 有効期限が近いかチェック（7日以内）
+  const isExpiryApproaching = (expiryDate: string) => {
+    const days = daysUntilExpiry(expiryDate)
+    return days <= 7 && days > 0
+  }
+
+  // 有効期限切れかチェック
+  const isExpired = (expiryDate: string) => {
+    return new Date() > new Date(expiryDate)
+  }
+
+  // 今月アンケートに回答したかチェック（延長可能か）
+  const hasAnsweredThisMonth = () => {
+    if (!localProfile?.last_answered_at) return false
+    
+    const now = new Date()
+    const lastAnswered = new Date(localProfile.last_answered_at)
+    
+    return (
+      now.getFullYear() === lastAnswered.getFullYear() &&
+      now.getMonth() === lastAnswered.getMonth()
+    )
+  }
+
+  // 最近延長したかチェック（24時間以内）
+  const hasRecentlyExtended = () => {
+    if (!localProfile?.last_survey_extended_at) return false
+    
+    const now = new Date()
+    const lastExtended = new Date(localProfile.last_survey_extended_at)
+    const hoursSinceExtension = (now.getTime() - lastExtended.getTime()) / (1000 * 60 * 60)
+    
+    // 24時間以内に延長していれば true
+    return hoursSinceExtension < 24
+  }
+
+  // 最後の延長からの経過時間を表示用にフォーマット
+  const getTimeSinceLastExtension = () => {
+    if (!localProfile?.last_survey_extended_at) return null
+    
+    const now = new Date()
+    const lastExtended = new Date(localProfile.last_survey_extended_at)
+    const hoursSinceExtension = (now.getTime() - lastExtended.getTime()) / (1000 * 60 * 60)
+    
+    if (hoursSinceExtension < 1) {
+      return '数分前'
+    } else if (hoursSinceExtension < 24) {
+      return `${Math.floor(hoursSinceExtension)}時間前`
+    } else {
+      const days = Math.floor(hoursSinceExtension / 24)
+      return `${days}日前`
+    }
   }
 
   const handleDeleteSurvey = async (surveyId: string, hasResponses: boolean) => {
@@ -846,6 +986,49 @@ export default function ProfilePage() {
                     <p className="text-sm text-muted-foreground mt-1">参加日: {formatDate(localProfile.joined_at)}</p>
                   </div>
                   
+                  {/* 回答数表示 - 大きく目立たせる */}
+                  <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                    <CardContent className="p-4 text-center">
+                      <div className="flex items-center justify-center space-x-2 mb-2">
+                        <Trophy className="w-5 h-5 text-green-600" />
+                        <span className="text-sm font-semibold text-green-800">あなたの回答数</span>
+                      </div>
+                      <div className="text-5xl font-bold text-green-600 mb-1">
+                        {localProfile.surveys_answered || 0}
+                      </div>
+                      <div className="text-lg text-green-700 font-medium mb-3">
+                        回答
+                      </div>
+                      {/* マイルストーン表示 */}
+                      <div className="space-y-1 text-xs text-green-700">
+                        {(localProfile.surveys_answered || 0) < 10 && (
+                          <div className="flex items-center justify-center space-x-1">
+                            <Target className="w-3 h-3" />
+                            <span>次の目標: 10回答</span>
+                          </div>
+                        )}
+                        {(localProfile.surveys_answered || 0) >= 10 && (localProfile.surveys_answered || 0) < 50 && (
+                          <div className="flex items-center justify-center space-x-1">
+                            <Target className="w-3 h-3" />
+                            <span>次の目標: 50回答</span>
+                          </div>
+                        )}
+                        {(localProfile.surveys_answered || 0) >= 50 && (localProfile.surveys_answered || 0) < 100 && (
+                          <div className="flex items-center justify-center space-x-1">
+                            <Medal className="w-3 h-3" />
+                            <span>次の目標: 100回答（マスター）</span>
+                          </div>
+                        )}
+                        {(localProfile.surveys_answered || 0) >= 100 && (
+                          <div className="flex items-center justify-center space-x-1">
+                            <Crown className="w-3 h-3" />
+                            <span>🎉 アンケートマスター達成！</span>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
                   {/* 投稿可能回数表示 */}
                   <Card className="bg-primary/5 border-primary/20">
                     <CardContent className="p-4 text-center">
@@ -860,8 +1043,15 @@ export default function ProfilePage() {
                         回
                       </div>
                       {!isDevAccount && (
-                        <div className="text-xs text-muted-foreground mt-2">
-                          あと{answersUntilNextPost(localProfile.surveys_answered || 0)}回答で+1回
+                        <div className="space-y-2 mt-3">
+                          <div className="text-xs text-muted-foreground">
+                            あと{answersUntilNextPost(localProfile.surveys_answered || 0)}回答で+1回
+                          </div>
+                          {/* プログレスバー */}
+                          <Progress 
+                            value={((localProfile.surveys_answered || 0) % 4) * 25} 
+                            className="h-2"
+                          />
                         </div>
                       )}
                     </CardContent>
@@ -878,21 +1068,88 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{localProfile.surveys_answered}</div>
-                    <div className="text-xs text-muted-foreground">回答数</div>
+                  <div className="text-center p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <Trophy className="w-5 h-5 text-green-600 mx-auto mb-1" />
+                    <div className="text-2xl font-bold text-green-600">{localProfile.surveys_answered}</div>
+                    <div className="text-xs text-green-700 font-medium">回答数</div>
                   </div>
-                  <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{localProfile.surveys_created}</div>
-                    <div className="text-xs text-muted-foreground">作成数</div>
+                  <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <MessageSquare className="w-5 h-5 text-blue-600 mx-auto mb-1" />
+                    <div className="text-2xl font-bold text-blue-600">{localProfile.surveys_created}</div>
+                    <div className="text-xs text-blue-700 font-medium">作成数</div>
                   </div>
-                  <div className="text-center p-3 bg-muted/30 rounded-lg">
-                    <div className="text-2xl font-bold text-primary">{localProfile.total_responses_received}</div>
-                    <div className="text-xs text-muted-foreground">総回答数</div>
+                  <div className="text-center p-3 bg-purple-50 border border-purple-200 rounded-lg col-span-2">
+                    <Users className="w-5 h-5 text-purple-600 mx-auto mb-1" />
+                    <div className="text-2xl font-bold text-purple-600">{localProfile.total_responses_received}</div>
+                    <div className="text-xs text-purple-700 font-medium">受け取った総回答数</div>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Survey Expiry Extension Status */}
+            {userSurveys.length > 0 && (
+              <Card className={localProfile?.last_survey_extended_at ? "border-green-200 bg-green-50/50" : "border-blue-200 bg-blue-50/50"}>
+                <CardHeader>
+                  <CardTitle className={`flex items-center space-x-2 ${localProfile?.last_survey_extended_at ? "text-green-800" : "text-blue-800"}`}>
+                    <Clock className="w-5 h-5" />
+                    <span>自動延長システム</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {localProfile?.last_survey_extended_at ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2 text-green-700">
+                        <Trophy className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                          {hasRecentlyExtended() ? '✨ 最近延長されました！' : '延長済み'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-green-600">
+                        最後の延長: {getTimeSinceLastExtension()}
+                      </p>
+                      <p className="text-xs text-green-700 bg-green-100 p-2 rounded">
+                        💡 アンケートに回答するたびに、あなたの全アンケートの有効期限が自動的に1か月延長されます！
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2 text-blue-700">
+                        <Zap className="w-4 h-4" />
+                        <span className="text-sm font-medium">自動延長が有効です</span>
+                      </div>
+                      <p className="text-xs text-blue-700">
+                        アンケートに回答すると、あなたの全アンケートの有効期限が自動的に1か月延長されます。
+                      </p>
+                      <Link href="/app">
+                        <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700">
+                          <MessageSquare className="w-3 h-3 mr-1" />
+                          アンケートに回答する
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                  
+                  {/* 有効期限が近いアンケートの警告 */}
+                  {userSurveys.some(s => s.expires_at && isExpiryApproaching(s.expires_at)) && (
+                    <div className="border-t pt-3 mt-3">
+                      <div className="flex items-center space-x-2 text-red-700 mb-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="text-xs font-semibold">有効期限が近いアンケート</span>
+                      </div>
+                      {userSurveys
+                        .filter(s => s.expires_at && isExpiryApproaching(s.expires_at))
+                        .map(survey => (
+                          <div key={survey.id} className="text-xs text-red-600 mb-1">
+                            • {survey.title} (残り{daysUntilExpiry(survey.expires_at!)}日)
+                          </div>
+                        ))
+                      }
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Admin Notification Panel */}
             {isAdmin && (
@@ -950,6 +1207,39 @@ export default function ProfilePage() {
 
               {/* Surveys Tab */}
               <TabsContent value="surveys" className="space-y-6">
+                {/* 有効期限延長アラート */}
+                {userSurveys.length > 0 && userSurveys.some(s => s.expires_at && isExpiryApproaching(s.expires_at)) && (
+                  <Alert className="border-red-200 bg-red-50">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    <div className="text-red-800">
+                      <strong className="font-semibold">⚠️ 有効期限が近いアンケートがあります</strong>
+                      <p className="mt-1 text-sm">
+                        アンケートに回答すると、あなたの全アンケートの有効期限が自動的に1か月延長されます！
+                      </p>
+                      <Link href="/app" className="inline-block mt-2">
+                        <Button size="sm" className="bg-red-600 hover:bg-red-700">
+                          <MessageSquare className="w-3 h-3 mr-1" />
+                          今すぐ回答して延長
+                        </Button>
+                      </Link>
+                    </div>
+                  </Alert>
+                )}
+                
+                {/* 自動延長情報（期限が近くない場合） */}
+                {userSurveys.length > 0 && !userSurveys.some(s => s.expires_at && isExpiryApproaching(s.expires_at)) && hasRecentlyExtended() && (
+                  <Alert className="border-green-200 bg-green-50">
+                    <Trophy className="h-4 w-4 text-green-600" />
+                    <div className="text-green-800">
+                      <strong className="font-semibold">✨ 延長されました！</strong>
+                      <p className="mt-1 text-sm">
+                        {getTimeSinceLastExtension()}に全アンケートの有効期限が1か月延長されました。
+                        引き続きアンケートに回答して、有効期限を維持しましょう！
+                      </p>
+                    </div>
+                  </Alert>
+                )}
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
@@ -987,10 +1277,31 @@ export default function ProfilePage() {
                                 {survey.description && (
                                   <p className="text-sm text-muted-foreground mb-2">{survey.description}</p>
                                 )}
-                                <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                                <div className="flex items-center flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
                                   <span>質問数: {survey.questions.length}</span>
                                   <span>回答数: {survey.response_count}</span>
                                   <span>作成日: {formatDate(survey.created_at)}</span>
+                                  {/* 有効期限を作成日の隣に表示 */}
+                                  {survey.expires_at && (
+                                    <>
+                                      {isExpired(survey.expires_at) ? (
+                                        <span className="text-red-600 font-medium flex items-center">
+                                          <AlertTriangle className="w-3 h-3 mr-1" />
+                                          期限: 期限切れ
+                                        </span>
+                                      ) : isExpiryApproaching(survey.expires_at) ? (
+                                        <span className="text-yellow-700 font-medium flex items-center">
+                                          <Clock className="w-3 h-3 mr-1" />
+                                          期限: {formatDate(survey.expires_at)} (残り{daysUntilExpiry(survey.expires_at)}日)
+                                        </span>
+                                      ) : (
+                                        <span className="text-green-700 font-medium flex items-center">
+                                          <Clock className="w-3 h-3 mr-1" />
+                                          期限: {formatDate(survey.expires_at)} (残り{daysUntilExpiry(survey.expires_at)}日)
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex items-center space-x-2">
@@ -1197,6 +1508,37 @@ export default function ProfilePage() {
 
               {/* Answered Surveys Tab */}
               <TabsContent value="answered" className="space-y-6">
+                {/* 回答数サマリー */}
+                <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Trophy className="w-6 h-6 text-green-600" />
+                          <h3 className="text-lg font-semibold text-green-800">総回答数</h3>
+                        </div>
+                        <div className="text-4xl font-bold text-green-600 mb-1">
+                          {localProfile.surveys_answered || 0}
+                        </div>
+                        <p className="text-sm text-green-700">
+                          これまで{localProfile.surveys_answered || 0}件のアンケートに回答しました
+                        </p>
+                        {!isDevAccount && (
+                          <p className="text-xs text-green-600 mt-2 flex items-center">
+                            <Zap className="w-3 h-3 mr-1" />
+                            あと{answersUntilNextPost(localProfile.surveys_answered || 0)}回答で新しい投稿権を獲得！
+                          </p>
+                        )}
+                      </div>
+                      <div className="hidden sm:block">
+                        <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg">
+                          <Trophy className="w-12 h-12 text-green-500" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">

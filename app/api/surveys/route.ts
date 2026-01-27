@@ -66,12 +66,17 @@ export async function GET(request: NextRequest) {
     
     const snapshot = await getDocs(surveysQuery)
     const surveys = snapshot.docs
-      .map(doc => ({
-        id: doc.id,
-        ...(doc.data() as any),
-        created_at: (doc.data() as any).created_at?.toDate?.()?.toISOString() || (doc.data() as any).created_at,
-        updated_at: (doc.data() as any).updated_at?.toDate?.()?.toISOString() || (doc.data() as any).updated_at
-      }))
+      .map(doc => {
+        const data = doc.data() as any
+        return {
+          id: doc.id,
+          ...data,
+          created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+          updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+          expires_at: data.expires_at?.toDate?.()?.toISOString() || data.expires_at,
+          last_extended_at: data.last_extended_at?.toDate?.()?.toISOString() || data.last_extended_at
+        }
+      })
       .sort((a, b) => {
         // 手動でcreated_atで降順ソート
         const dateA = new Date(a.created_at).getTime()
@@ -111,6 +116,11 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     const validatedData = validateInput(SurveySchema, body)
     console.log('Validated data:', JSON.stringify(validatedData, null, 2))
 
+    // 有効期限を計算（作成日から1か月後）
+    const now = new Date()
+    const expiryDate = new Date(now)
+    expiryDate.setMonth(expiryDate.getMonth() + 1)
+
     const surveyData: any = {
       type: validatedData.type || 'native', // デフォルトはネイティブ形式（既存データとの互換性）
       title: validatedData.title,
@@ -118,6 +128,8 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       creator_id: user.uid, // Use authenticated user's UID
       is_published: validatedData.is_published || false,
       response_count: 0,
+      expires_at: expiryDate, // 有効期限（1か月後）
+      last_extended_at: now, // 最後に延長した日時
       created_at: serverTimestamp(),
       updated_at: serverTimestamp()
     }

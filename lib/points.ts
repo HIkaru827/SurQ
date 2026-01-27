@@ -13,6 +13,77 @@ export interface Question {
   allowMultiple?: boolean
 }
 
+// ===== アンケート有効期限システム =====
+/**
+ * アンケートの有効期限を計算する（作成日から1か月）
+ * @param createdAt 作成日時
+ * @returns 有効期限
+ */
+export function calculateExpiryDate(createdAt: Date): Date {
+  const expiryDate = new Date(createdAt)
+  expiryDate.setMonth(expiryDate.getMonth() + 1)
+  return expiryDate
+}
+
+/**
+ * 有効期限を延長する（現在日から1か月）
+ * @param currentExpiry 現在の有効期限
+ * @returns 延長後の有効期限
+ */
+export function extendExpiryDate(currentExpiry: Date): Date {
+  const now = new Date()
+  const extended = new Date(Math.max(currentExpiry.getTime(), now.getTime()))
+  extended.setMonth(extended.getMonth() + 1)
+  return extended
+}
+
+/**
+ * アンケートが有効期限切れかチェック
+ * @param expiryDate 有効期限
+ * @returns 期限切れかどうか
+ */
+export function isExpired(expiryDate: Date): boolean {
+  return new Date() > expiryDate
+}
+
+/**
+ * 有効期限までの残り日数を計算
+ * @param expiryDate 有効期限
+ * @returns 残り日数
+ */
+export function daysUntilExpiry(expiryDate: Date): number {
+  const now = new Date()
+  const diff = expiryDate.getTime() - now.getTime()
+  return Math.ceil(diff / (1000 * 60 * 60 * 24))
+}
+
+/**
+ * 有効期限が近づいているか（7日以内）
+ * @param expiryDate 有効期限
+ * @returns 近づいているかどうか
+ */
+export function isExpiryApproaching(expiryDate: Date): boolean {
+  const days = daysUntilExpiry(expiryDate)
+  return days <= 7 && days > 0
+}
+
+/**
+ * ユーザーが今月アンケートに回答したかチェック
+ * @param lastAnsweredAt 最後に回答した日時
+ * @returns 今月回答したかどうか
+ */
+export function hasAnsweredThisMonth(lastAnsweredAt: Date | null): boolean {
+  if (!lastAnsweredAt) return false
+  
+  const now = new Date()
+  const lastAnswered = new Date(lastAnsweredAt)
+  
+  return (
+    now.getFullYear() === lastAnswered.getFullYear() &&
+    now.getMonth() === lastAnswered.getMonth()
+  )
+}
+
 /**
  * ユーザーがアンケートを投稿できるかチェックする
  * @param surveys_answered 回答したアンケート総数

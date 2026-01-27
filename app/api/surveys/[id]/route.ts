@@ -35,11 +35,14 @@ export async function GET(
       return NextResponse.json({ error: "Survey not found" }, { status: 404 })
     }
 
+    const data = surveyDoc.data()
     const survey = {
       id: surveyDoc.id,
-      ...surveyDoc.data(),
-      created_at: surveyDoc.data()?.created_at?.toDate?.()?.toISOString() || surveyDoc.data()?.created_at,
-      updated_at: surveyDoc.data()?.updated_at?.toDate?.()?.toISOString() || surveyDoc.data()?.updated_at
+      ...data,
+      created_at: data?.created_at?.toDate?.()?.toISOString() || data?.created_at,
+      updated_at: data?.updated_at?.toDate?.()?.toISOString() || data?.updated_at,
+      expires_at: data?.expires_at?.toDate?.()?.toISOString() || data?.expires_at,
+      last_extended_at: data?.last_extended_at?.toDate?.()?.toISOString() || data?.last_extended_at
     }
 
     return NextResponse.json({ survey })

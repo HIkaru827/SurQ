@@ -10,7 +10,7 @@ import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart3, Users, Trophy, Zap, ArrowRight, PlusCircle, MessageSquare, Star, User, Mail, Info } from "lucide-react"
+import { BarChart3, Users, Trophy, Zap, ArrowRight, PlusCircle, MessageSquare, Star, User, Mail, Info, Clock, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 
@@ -28,6 +28,8 @@ interface Survey {
   created_at: string
   updated_at: string
   has_answered?: boolean
+  expires_at?: string // 有効期限
+  last_extended_at?: string // 最後に延長した日時
 }
 
 export default function AppPage() {
@@ -169,6 +171,25 @@ export default function AppPage() {
     })
   }
 
+  // 有効期限までの残り日数を計算
+  const daysUntilExpiry = (expiryDate: string) => {
+    const now = new Date()
+    const expiry = new Date(expiryDate)
+    const diff = expiry.getTime() - now.getTime()
+    return Math.ceil(diff / (1000 * 60 * 60 * 24))
+  }
+
+  // 有効期限が近いかチェック（7日以内）
+  const isExpiryApproaching = (expiryDate: string) => {
+    const days = daysUntilExpiry(expiryDate)
+    return days <= 7 && days > 0
+  }
+
+  // 有効期限切れかチェック
+  const isExpired = (expiryDate: string) => {
+    return new Date() > new Date(expiryDate)
+  }
+
   // 並び替え処理
   const sortedSurveys = [...surveys].sort((a, b) => {
     if (sortBy === 'popular') {
@@ -192,9 +213,16 @@ export default function AppPage() {
             </div>
             <div className="flex items-center space-x-1 sm:space-x-3">
               {userProfile && (
-                <div className="flex items-center">
+                <div className="flex items-center gap-1 sm:gap-2">
+                  {/* 回答数バッジ */}
+                  <Badge variant="outline" className="font-medium text-xs sm:text-sm px-2 py-1 bg-green-50 text-green-700 border-green-200">
+                    <Trophy className="w-3 h-3 mr-1 inline" />
+                    <span className="hidden sm:inline">回答: </span>{userProfile.surveys_answered || 0}回
+                  </Badge>
+                  {/* 投稿可能回数バッジ */}
                   <Badge variant="secondary" className={`font-medium text-xs sm:text-sm px-2 py-1 ${isDevAccount ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-primary/10 text-primary border-primary/20'}`}>
-                    {isDevAccount ? '∞回投稿可能' : `投稿可能: ${calculateAvailablePosts(userProfile.surveys_answered || 0, userProfile.surveys_created || 0)}回`}
+                    <Star className="w-3 h-3 mr-1 inline" />
+                    {isDevAccount ? '∞回投稿可能' : `${calculateAvailablePosts(userProfile.surveys_answered || 0, userProfile.surveys_created || 0)}回投稿可能`}
                   </Badge>
                 </div>
               )}
@@ -269,9 +297,32 @@ export default function AppPage() {
                         </div>
                         
                         <div className="flex items-center justify-between flex-wrap gap-2">
-                          <Badge variant="outline" className="text-xs px-2 py-1">
-                            {formatDate(survey.created_at)}
-                          </Badge>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-xs px-2 py-1">
+                              📅 {formatDate(survey.created_at)}
+                            </Badge>
+                            {/* 有効期限を作成日の隣に表示 */}
+                            {survey.expires_at && (
+                              <>
+                                {isExpired(survey.expires_at) ? (
+                                  <Badge variant="destructive" className="text-xs px-2 py-1">
+                                    <AlertTriangle className="w-3 h-3 mr-1" />
+                                    期限切れ
+                                  </Badge>
+                                ) : isExpiryApproaching(survey.expires_at) ? (
+                                  <Badge variant="outline" className="text-xs px-2 py-1 bg-yellow-50 text-yellow-700 border-yellow-300">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    期限: {formatDate(survey.expires_at)}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs px-2 py-1 bg-green-50 text-green-700 border-green-300">
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    期限: {formatDate(survey.expires_at)}
+                                  </Badge>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
 
                         {survey.is_published ? (
@@ -406,9 +457,32 @@ export default function AppPage() {
                       </div>
                       
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <Badge variant="outline" className="text-xs px-2 py-1">
-                          {formatDate(survey.created_at)}
-                        </Badge>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs px-2 py-1">
+                            📅 {formatDate(survey.created_at)}
+                          </Badge>
+                          {/* 有効期限表示 */}
+                          {survey.expires_at && (
+                            <>
+                              {isExpired(survey.expires_at) ? (
+                                <Badge variant="destructive" className="text-xs px-2 py-1">
+                                  <AlertTriangle className="w-3 h-3 mr-1" />
+                                  期限切れ
+                                </Badge>
+                              ) : isExpiryApproaching(survey.expires_at) ? (
+                                <Badge variant="outline" className="text-xs px-2 py-1 bg-yellow-50 text-yellow-700 border-yellow-300">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  期限: {formatDate(survey.expires_at)}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs px-2 py-1 bg-green-50 text-green-700 border-green-300">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  期限: {formatDate(survey.expires_at)}
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                        </div>
                         {survey.category && (
                           <Badge variant="secondary" className="text-xs px-2 py-1">
                             {survey.category}

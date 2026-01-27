@@ -83,7 +83,7 @@ export async function POST(
       updated_at: serverTimestamp()
     })
 
-    // 回答者の回答数をインクリメント
+    // 回答者の回答数をインクリメント & アンケート有効期限を延長
     if (respondent_email) {
       console.log('Incrementing surveys_answered for user:', respondent_email)
       const usersQuery = query(collection(db, 'users'), where('email', '==', respondent_email))
@@ -92,15 +92,65 @@ export async function POST(
       if (!userSnapshot.empty) {
         // 既存ユーザーの回答数を更新
         const userDoc = userSnapshot.docs[0]
+        const userData = userDoc.data()
         
         console.log('Updating existing user surveys_answered')
         
+        // 最後に回答した日時を記録
         await updateDoc(doc(db, 'users', userDoc.id), {
           surveys_answered: increment(1),
+          last_answered_at: serverTimestamp(),
           updated_at: serverTimestamp()
         })
         
         console.log('surveys_answered updated successfully')
+        
+        // 🎯 重要：回答者の全アンケートの有効期限を自動延長（回答するたびに延長）
+        try {
+          // ユーザーIDを取得（FirebaseのUIDを使用）
+          const userUid = userData.uid || userDoc.id
+          const now = new Date()
+          
+          console.log('Extending survey expiry dates for user:', respondent_email)
+          
+          // ユーザーの全公開アンケートを取得
+          const userSurveysQuery = query(
+            collection(db, 'surveys'),
+            where('creator_id', '==', userUid),
+            where('is_published', '==', true)
+          )
+          const userSurveysSnapshot = await getDocs(userSurveysQuery)
+          
+          // 各アンケートの有効期限を1か月延長
+          const extendPromises = userSurveysSnapshot.docs.map(async (surveyDoc) => {
+            const surveyData = surveyDoc.data()
+            const currentExpiry = surveyData.expires_at?.toDate?.() || new Date()
+            
+            // 現在の有効期限と現在日時の遅い方から1か月延長
+            const newExpiry = new Date(Math.max(currentExpiry.getTime(), now.getTime()))
+            newExpiry.setMonth(newExpiry.getMonth() + 1)
+            
+            await updateDoc(doc(db, 'surveys', surveyDoc.id), {
+              expires_at: newExpiry,
+              last_extended_at: now,
+              updated_at: serverTimestamp()
+            })
+          })
+          
+          await Promise.all(extendPromises)
+          
+          // ユーザーの延長記録を更新
+          await updateDoc(doc(db, 'users', userDoc.id), {
+            last_survey_extended_at: serverTimestamp()
+          })
+          
+          console.log(`Extended ${userSurveysSnapshot.size} surveys for user`)
+          console.log('Auto-extension: Surveys extended on every answer')
+        } catch (extendError) {
+          console.error('Failed to extend survey expiry:', extendError)
+          // 延長エラーは回答送信を妨げない
+        }
+        
       } else {
         // ユーザーが存在しない場合、新規作成
         console.log('Creating new user')
@@ -111,6 +161,7 @@ export async function POST(
           // level: 廃止
           surveys_answered: 1,
           surveys_created: 0,
+          last_answered_at: serverTimestamp(),
           badges: [],
           created_at: serverTimestamp(),
           updated_at: serverTimestamp()
