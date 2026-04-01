@@ -1087,70 +1087,6 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            {/* Survey Expiry Extension Status */}
-            {userSurveys.length > 0 && (
-              <Card className={localProfile?.last_survey_extended_at ? "border-green-200 bg-green-50/50" : "border-blue-200 bg-blue-50/50"}>
-                <CardHeader>
-                  <CardTitle className={`flex items-center space-x-2 ${localProfile?.last_survey_extended_at ? "text-green-800" : "text-blue-800"}`}>
-                    <Clock className="w-5 h-5" />
-                    <span>自動延長システム</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {localProfile?.last_survey_extended_at ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2 text-green-700">
-                        <Trophy className="w-4 h-4" />
-                        <span className="text-sm font-medium">
-                          {hasRecentlyExtended() ? '✨ 最近延長されました！' : '延長済み'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-green-600">
-                        最後の延長: {getTimeSinceLastExtension()}
-                      </p>
-                      <p className="text-xs text-green-700 bg-green-100 p-2 rounded">
-                        💡 アンケートに回答するたびに、あなたの全アンケートの有効期限が自動的に1か月延長されます！
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2 text-blue-700">
-                        <Zap className="w-4 h-4" />
-                        <span className="text-sm font-medium">自動延長が有効です</span>
-                      </div>
-                      <p className="text-xs text-blue-700">
-                        アンケートに回答すると、あなたの全アンケートの有効期限が自動的に1か月延長されます。
-                      </p>
-                      <Link href="/app">
-                        <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700">
-                          <MessageSquare className="w-3 h-3 mr-1" />
-                          アンケートに回答する
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
-                  
-                  {/* 有効期限が近いアンケートの警告 */}
-                  {userSurveys.some(s => s.expires_at && isExpiryApproaching(s.expires_at)) && (
-                    <div className="border-t pt-3 mt-3">
-                      <div className="flex items-center space-x-2 text-red-700 mb-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span className="text-xs font-semibold">有効期限が近いアンケート</span>
-                      </div>
-                      {userSurveys
-                        .filter(s => s.expires_at && isExpiryApproaching(s.expires_at))
-                        .map(survey => (
-                          <div key={survey.id} className="text-xs text-red-600 mb-1">
-                            • {survey.title} (残り{daysUntilExpiry(survey.expires_at!)}日)
-                          </div>
-                        ))
-                      }
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
             {/* Admin Notification Panel */}
             {isAdmin && (
               <Card className="border-orange-200 bg-orange-50/50">
@@ -1207,39 +1143,6 @@ export default function ProfilePage() {
 
               {/* Surveys Tab */}
               <TabsContent value="surveys" className="space-y-6">
-                {/* 有効期限延長アラート */}
-                {userSurveys.length > 0 && userSurveys.some(s => s.expires_at && isExpiryApproaching(s.expires_at)) && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertTriangle className="h-4 w-4 text-red-600" />
-                    <div className="text-red-800">
-                      <strong className="font-semibold">⚠️ 有効期限が近いアンケートがあります</strong>
-                      <p className="mt-1 text-sm">
-                        アンケートに回答すると、あなたの全アンケートの有効期限が自動的に1か月延長されます！
-                      </p>
-                      <Link href="/app" className="inline-block mt-2">
-                        <Button size="sm" className="bg-red-600 hover:bg-red-700">
-                          <MessageSquare className="w-3 h-3 mr-1" />
-                          今すぐ回答して延長
-                        </Button>
-                      </Link>
-                    </div>
-                  </Alert>
-                )}
-                
-                {/* 自動延長情報（期限が近くない場合） */}
-                {userSurveys.length > 0 && !userSurveys.some(s => s.expires_at && isExpiryApproaching(s.expires_at)) && hasRecentlyExtended() && (
-                  <Alert className="border-green-200 bg-green-50">
-                    <Trophy className="h-4 w-4 text-green-600" />
-                    <div className="text-green-800">
-                      <strong className="font-semibold">✨ 延長されました！</strong>
-                      <p className="mt-1 text-sm">
-                        {getTimeSinceLastExtension()}に全アンケートの有効期限が1か月延長されました。
-                        引き続きアンケートに回答して、有効期限を維持しましょう！
-                      </p>
-                    </div>
-                  </Alert>
-                )}
-
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">

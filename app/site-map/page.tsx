@@ -128,6 +128,9 @@ export default function SitemapPage() {
           <p className="text-muted-foreground max-w-2xl mx-auto">
             SurQアンケートプラットフォームの全ページとその機能をご覧いただけます
           </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            検索エンジン向けXMLサイトマップは <a href="/sitemap.xml" className="text-primary hover:underline">/sitemap.xml</a> をご覧ください
+          </p>
         </div>
 
         <div className="grid gap-8">

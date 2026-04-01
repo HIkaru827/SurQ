@@ -40,6 +40,65 @@ function CreateSurveyPageInner() {
   const [category, setCategory] = useState<string>("")
   const [targetAudience, setTargetAudience] = useState("")
 
+  // SEO対策: 構造化データ（JSON-LD）の追加
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const existingScript = document.querySelector('script[type="application/ld+json"][data-page="survey-create"]')
+      if (existingScript) {
+        existingScript.remove()
+      }
+
+      // WebPage スキーマ
+      const webPageSchema = {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "アンケート作成",
+        "description": "SurQでオリジナルのアンケートを作成",
+        "url": `${window.location.origin}/survey/create`,
+        "potentialAction": {
+          "@type": "CreateAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": `${window.location.origin}/survey/create`,
+            "actionPlatform": [
+              "http://schema.org/DesktopWebPlatform",
+              "http://schema.org/MobileWebPlatform"
+            ]
+          },
+          "result": {
+            "@type": "Survey"
+          }
+        }
+      }
+
+      // BreadcrumbList スキーマ
+      const breadcrumbSchema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "ホーム",
+            "item": `${window.location.origin}/`
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "アンケート作成",
+            "item": `${window.location.origin}/survey/create`
+          }
+        ]
+      }
+
+      const script = document.createElement('script')
+      script.type = 'application/ld+json'
+      script.setAttribute('data-page', 'survey-create')
+      script.textContent = JSON.stringify([webPageSchema, breadcrumbSchema])
+      document.head.appendChild(script)
+    }
+  }, [])
+
   // ユーザー情報の取得
   useEffect(() => {
     async function fetchUserProfile() {

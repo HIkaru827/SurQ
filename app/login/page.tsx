@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,51 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // SEO対策: 構造化データ（JSON-LD）の追加
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const existingScript = document.querySelector('script[type="application/ld+json"][data-page="login"]')
+      if (existingScript) {
+        existingScript.remove()
+      }
+
+      // WebPage スキーマ
+      const webPageSchema = {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "ログイン",
+        "description": "SurQアカウントにログイン",
+        "url": `${window.location.origin}/login`
+      }
+
+      // BreadcrumbList スキーマ
+      const breadcrumbSchema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "ホーム",
+            "item": `${window.location.origin}/`
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "ログイン",
+            "item": `${window.location.origin}/login`
+          }
+        ]
+      }
+
+      const script = document.createElement('script')
+      script.type = 'application/ld+json'
+      script.setAttribute('data-page', 'login')
+      script.textContent = JSON.stringify([webPageSchema, breadcrumbSchema])
+      document.head.appendChild(script)
+    }
+  }, [])
 
   const getErrorMessage = (error: any): string => {
     if (error instanceof FirebaseError) {

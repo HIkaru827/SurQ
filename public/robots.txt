@@ -2,6 +2,7 @@
 
 User-agent: *
 Allow: /
+Allow: /app
 Allow: /login
 Allow: /signup
 Allow: /privacy
@@ -17,6 +18,7 @@ Disallow: /api/
 Disallow: /survey/*/responses
 Disallow: /profile
 Disallow: /dashboard
+Disallow: /admin
 # 開発・テスト用ファイル
 Disallow: /*.bak
 Disallow: /*test*

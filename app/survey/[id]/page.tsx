@@ -79,6 +79,87 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     }
   }, [user])
 
+  // SEO対策: アンケートデータ取得後にメタデータと構造化データを更新
+  useEffect(() => {
+    if (typeof window !== 'undefined' && survey) {
+      // ページタイトルを動的に更新
+      document.title = `${survey.title} - SurQ`
+
+      // メタディスクリプションを更新
+      const setMetaTag = (name: string, content: string, isProperty = false) => {
+        const attribute = isProperty ? 'property' : 'name'
+        let meta = document.querySelector(`meta[${attribute}="${name}"]`)
+        if (!meta) {
+          meta = document.createElement('meta')
+          meta.setAttribute(attribute, name)
+          document.head.appendChild(meta)
+        }
+        meta.setAttribute('content', content)
+      }
+
+      const description = survey.description || 'アンケートに回答して投稿権を獲得しよう。'
+      setMetaTag('description', description)
+      setMetaTag('og:title', `${survey.title} - SurQ`, true)
+      setMetaTag('og:description', description, true)
+      setMetaTag('twitter:title', `${survey.title} - SurQ`)
+      setMetaTag('twitter:description', description)
+
+      // 構造化データ（JSON-LD）の追加
+      const existingScript = document.querySelector('script[type="application/ld+json"][data-page="survey"]')
+      if (existingScript) {
+        existingScript.remove()
+      }
+
+      // Survey スキーマ
+      const surveySchema = {
+        "@context": "https://schema.org",
+        "@type": "Survey",
+        "name": survey.title,
+        "description": description,
+        "url": `${window.location.origin}/survey/${survey.id}`,
+        ...(survey.category && { "about": survey.category }),
+        ...(survey.estimated_time && { "timeRequired": `PT${survey.estimated_time}M` }),
+        "interactionStatistic": {
+          "@type": "InteractionCounter",
+          "interactionType": "https://schema.org/CommentAction",
+          "userInteractionCount": survey.response_count
+        }
+      }
+
+      // BreadcrumbList スキーマ
+      const breadcrumbSchema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "ホーム",
+            "item": `${window.location.origin}/`
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "アンケート一覧",
+            "item": `${window.location.origin}/app`
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": survey.title,
+            "item": `${window.location.origin}/survey/${survey.id}`
+          }
+        ]
+      }
+
+      const script = document.createElement('script')
+      script.type = 'application/ld+json'
+      script.setAttribute('data-page', 'survey')
+      script.textContent = JSON.stringify([surveySchema, breadcrumbSchema])
+      document.head.appendChild(script)
+    }
+  }, [survey])
+
   const fetchSurvey = async (id: string) => {
     try {
       const response = await fetch(`/api/surveys/${id}`)

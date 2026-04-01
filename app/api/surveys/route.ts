@@ -1,12 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { Question } from "@/lib/points"
 import { isDeveloperAccount } from "@/lib/developer"
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, serverTimestamp, updateDoc, doc, increment } from "firebase/firestore"
+import { getFirestore, collection, addDoc, getDocs, query, where, serverTimestamp, updateDoc, doc, increment } from "firebase/firestore"
 import { withAuth, createErrorResponse, validateOrigin, authenticateUser } from "@/lib/auth-middleware"
-import { validateInput, SurveySchema, QueryParamsSchema, validateCanCreateSurvey } from "@/lib/validation"
+import { validateInput, SurveySchema, validateCanCreateSurvey } from "@/lib/validation"
 
-// Firebase client config for server-side usage
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -16,7 +14,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-// Initialize Firebase for server-side API routes
 let app
 if (!getApps().length) {
   app = initializeApp(firebaseConfig)
@@ -29,118 +26,90 @@ const db = getFirestore(app)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const includeUnpublished = searchParams.get('include_unpublished') === 'true'
-    const creatorId = searchParams.get('creator_id')
-    
-    // creator_idが指定された場合は認証が必要
+    const includeUnpublished = searchParams.get("include_unpublished") === "true"
+    const creatorId = searchParams.get("creator_id")
+
     if (creatorId) {
       try {
         const user = await authenticateUser(request)
-        // ユーザーは自分のアンケートのみ取得可能
         if (user.uid !== creatorId) {
-          return createErrorResponse('Unauthorized: Can only access own surveys', 403)
+          return createErrorResponse("Unauthorized: Can only access own surveys", 403)
         }
-      } catch (error) {
-        return createErrorResponse('Authentication required for user surveys', 401)
+      } catch {
+        return createErrorResponse("Authentication required for user surveys", 401)
       }
     }
-    
+
     let surveysQuery
-    
+
     if (creatorId) {
-      // 特定のユーザーのアンケートのみ（公開・未公開問わず）
-      surveysQuery = query(
-        collection(db, 'surveys'),
-        where('creator_id', '==', creatorId)
-      )
+      surveysQuery = query(collection(db, "surveys"), where("creator_id", "==", creatorId))
     } else if (!includeUnpublished) {
-      // 公開されたアンケートのみを返す（デフォルト）
-      surveysQuery = query(
-        collection(db, 'surveys'),
-        where('is_published', '==', true)
-      )
+      surveysQuery = query(collection(db, "surveys"), where("is_published", "==", true))
     } else {
-      // 全てのアンケート（orderByのみ）
-      surveysQuery = query(collection(db, 'surveys'))
+      surveysQuery = query(collection(db, "surveys"))
     }
-    
+
     const snapshot = await getDocs(surveysQuery)
     const surveys = snapshot.docs
-      .map(doc => {
-        const data = doc.data() as any
+      .map((surveyDoc) => {
+        const data = surveyDoc.data() as Record<string, any>
+        const { expires_at, last_extended_at, expired_at, ...rest } = data
+
         return {
-          id: doc.id,
-          ...data,
+          id: surveyDoc.id,
+          ...rest,
           created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
           updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
-          expires_at: data.expires_at?.toDate?.()?.toISOString() || data.expires_at,
-          last_extended_at: data.last_extended_at?.toDate?.()?.toISOString() || data.last_extended_at
         }
       })
-      .sort((a, b) => {
-        // 手動でcreated_atで降順ソート
-        const dateA = new Date(a.created_at).getTime()
-        const dateB = new Date(b.created_at).getTime()
-        return dateB - dateA
-      })
-    
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
     const response = NextResponse.json({ surveys })
-    
-    // 公開アンケートは30秒キャッシュ
+
     if (!creatorId && !includeUnpublished) {
-      response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')
+      response.headers.set("Cache-Control", "public, s-maxage=30, stale-while-revalidate=60")
     }
-    
+
     return response
   } catch (error) {
-    console.error('Error fetching surveys:', error)
-    return NextResponse.json({ 
-      error: "Failed to fetch surveys",
-      details: error instanceof Error ? error.message : "Unknown error"
-    }, { status: 500 })
+    console.error("Error fetching surveys:", error)
+    return NextResponse.json(
+      {
+        error: "Failed to fetch surveys",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    )
   }
 }
 
 export const POST = withAuth(async (request: NextRequest, user) => {
   try {
-    // Validate origin
     if (!validateOrigin(request)) {
-      console.error('Origin validation failed for request:', request.url, request.headers.get('origin'))
-      return createErrorResponse('Invalid origin', 403)
+      console.error("Origin validation failed for request:", request.url, request.headers.get("origin"))
+      return createErrorResponse("Invalid origin", 403)
     }
 
     const body = await request.json()
-    console.log('Survey creation request body:', JSON.stringify(body, null, 2))
-    
-    // Validate input data
     const validatedData = validateInput(SurveySchema, body)
-    console.log('Validated data:', JSON.stringify(validatedData, null, 2))
 
-    // 有効期限を計算（作成日から1か月後）
-    const now = new Date()
-    const expiryDate = new Date(now)
-    expiryDate.setMonth(expiryDate.getMonth() + 1)
-
-    const surveyData: any = {
-      type: validatedData.type || 'native', // デフォルトはネイティブ形式（既存データとの互換性）
+    const surveyData: Record<string, any> = {
+      type: validatedData.type || "native",
       title: validatedData.title,
       description: validatedData.description || null,
-      creator_id: user.uid, // Use authenticated user's UID
+      creator_id: user.uid,
       is_published: validatedData.is_published || false,
       response_count: 0,
-      expires_at: expiryDate, // 有効期限（1か月後）
-      last_extended_at: now, // 最後に延長した日時
       created_at: serverTimestamp(),
-      updated_at: serverTimestamp()
+      updated_at: serverTimestamp(),
     }
 
-    // ネイティブ形式の場合
-    if (validatedData.type === 'native' || !validatedData.type) {
+    if (validatedData.type === "native" || !validatedData.type) {
       surveyData.questions = validatedData.questions || []
     }
 
-    // Googleフォーム形式の場合
-    if (validatedData.type === 'google_form') {
+    if (validatedData.type === "google_form") {
       surveyData.google_form_url = validatedData.google_form_url
       surveyData.embedded_url = validatedData.embedded_url
       surveyData.estimated_time = validatedData.estimated_time
@@ -148,47 +117,42 @@ export const POST = withAuth(async (request: NextRequest, user) => {
       surveyData.target_audience = validatedData.target_audience || null
     }
 
-    // 公開時はユーザーの投稿権をチェック・消費（開発者アカウントはスキップ）
     if (validatedData.is_published) {
       const isDevAccount = isDeveloperAccount(user.email!)
-      
+
       if (!isDevAccount) {
-        const usersQuery = query(collection(db, 'users'), where('email', '==', user.email))
+        const usersQuery = query(collection(db, "users"), where("email", "==", user.email))
         const userSnapshot = await getDocs(usersQuery)
-        
+
         if (!userSnapshot.empty) {
           const userDoc = userSnapshot.docs[0]
           const userData = userDoc.data()
-          const surveys_answered = userData.surveys_answered || 0
-          const surveys_created = userData.surveys_created || 0
-          
-          // 投稿権チェック（4回答 = 1投稿権）
-          validateCanCreateSurvey(surveys_answered, surveys_created)
-          
-          // 投稿数をインクリメント
-          await updateDoc(doc(db, 'users', userDoc.id), {
+          validateCanCreateSurvey(userData.surveys_answered || 0, userData.surveys_created || 0)
+
+          await updateDoc(doc(db, "users", userDoc.id), {
             surveys_created: increment(1),
-            updated_at: serverTimestamp()
+            updated_at: serverTimestamp(),
           })
         }
       }
     }
 
-    // Firestoreに保存
-    const docRef = await addDoc(collection(db, 'surveys'), surveyData)
-    
-    // 作成されたドキュメントを取得して返す
-    const createdSurvey = {
-      id: docRef.id,
-      ...surveyData,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
+    const docRef = await addDoc(collection(db, "surveys"), surveyData)
 
-    return NextResponse.json({ survey: createdSurvey }, { status: 201 })
+    return NextResponse.json(
+      {
+        survey: {
+          id: docRef.id,
+          ...surveyData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      },
+      { status: 201 }
+    )
   } catch (error) {
-    console.error('Error creating survey:', error)
-    const message = error instanceof Error ? error.message : 'Failed to create survey'
+    console.error("Error creating survey:", error)
+    const message = error instanceof Error ? error.message : "Failed to create survey"
     return createErrorResponse(message, 500)
   }
 })
