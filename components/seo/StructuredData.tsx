@@ -18,7 +18,7 @@ export const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
   "name": "SurQ",
-  "description": "無料で使えるアンケートプラットフォーム",
+  "description": "大学生向けの無料アンケート回答交換サービス",
   "url": "https://surq.net",
   "logo": "https://surq.net/surq_logo.png",
   "sameAs": [
@@ -36,9 +36,9 @@ export const webApplicationSchema = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   "name": "SurQ",
-  "description": "答えてポイント獲得、作って知見共有する循環型アンケートプラットフォーム",
+  "description": "大学生同士でアンケートに回答し合い、卒論やレポート向けの回答を集めやすくする無料Webアプリ",
   "url": "https://surq.net",
-  "applicationCategory": "BusinessApplication",
+  "applicationCategory": "EducationalApplication",
   "operatingSystem": "Any",
   "offers": {
     "@type": "Offer",
@@ -46,11 +46,11 @@ export const webApplicationSchema = {
     "priceCurrency": "JPY"
   },
   "featureList": [
-    "アンケート作成",
-    "アンケート回答",
-    "ポイントシステム",
-    "回答分析",
-    "通知機能"
+    "大学生向けアンケート回答交換",
+    "Googleフォーム対応",
+    "無料でアンケート募集",
+    "アンケート回答数に応じた投稿権",
+    "回答状況の確認"
   ]
 }
 
@@ -64,7 +64,7 @@ export const faqSchema = {
       "name": "SurQとは何ですか？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "SurQは無料で使えるアンケートプラットフォームです。アンケートに答えてポイントを獲得し、そのポイントで自分のアンケートを作成・配布できます。"
+        "text": "SurQは、大学生が互いにアンケートへ回答し合いながら、自分のアンケートも集めやすくする無料Webアプリです。"
       }
     },
     {
@@ -77,18 +77,18 @@ export const faqSchema = {
     },
     {
       "@type": "Question", 
-      "name": "ポイントはどのように使えますか？",
+      "name": "Googleフォームは使えますか？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "獲得したポイントは新しいアンケートの作成・配布に使用できます。より多くの人に回答してもらうためのプレミアム機能にも活用可能です。"
+        "text": "はい。SurQではGoogleフォームのURLを登録してアンケートを投稿できます。"
       }
     },
     {
       "@type": "Question",
-      "name": "回答データの安全性は保証されていますか？",
+      "name": "どんなアンケートに向いていますか？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "はい、SurQではFirebaseを基盤とした強固なセキュリティシステムを採用し、すべてのデータを暗号化して安全に保管しています。"
+        "text": "卒論、ゼミ、レポート、個人開発などで大学生向けアンケートを集めたいケースに向いています。"
       }
     }
   ]

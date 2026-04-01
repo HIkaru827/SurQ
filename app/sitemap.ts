@@ -1,44 +1,75 @@
-import { MetadataRoute } from 'next'
+import { MetadataRoute } from "next"
+import { SITE_URL } from "@/lib/seo"
+
+type SurveySitemapItem = {
+  id: string
+  updated_at?: string
+  is_published?: boolean
+}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://surq.net'
-  
-  // 静的ページ
+  const now = new Date()
+
   const staticPages: MetadataRoute.Sitemap = [
     {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 1.0,
+      url: SITE_URL,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 1,
     },
     {
-      url: `${baseUrl}/app`,
-      lastModified: new Date(),
-      changeFrequency: 'hourly',
+      url: `${SITE_URL}/surveys`,
+      lastModified: now,
+      changeFrequency: "hourly",
       priority: 0.9,
     },
     {
-      url: `${baseUrl}/survey/create`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.8,
+      url: `${SITE_URL}/contact`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.4,
     },
     {
-      url: `${baseUrl}/login`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
+      url: `${SITE_URL}/privacy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.2,
     },
     {
-      url: `${baseUrl}/signup`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
+      url: `${SITE_URL}/terms`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.2,
+    },
+    {
+      url: `${SITE_URL}/site-map`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.3,
     },
   ]
 
-  // 動的ページは実行時に生成されるため、ビルド時は静的ページのみ返す
-  // TODO: 本番環境では、データベースから直接アンケート一覧を取得して動的ページを生成
-  return staticPages
-}
+  try {
+    const response = await fetch(`${SITE_URL}/api/surveys`, {
+      next: { revalidate: 300 },
+    })
 
+    if (!response.ok) {
+      return staticPages
+    }
+
+    const data = (await response.json()) as { surveys?: SurveySitemapItem[] }
+    const surveyPages: MetadataRoute.Sitemap = (data.surveys || [])
+      .filter((survey) => survey.id && survey.is_published !== false)
+      .map((survey) => ({
+        url: `${SITE_URL}/survey/${survey.id}`,
+        lastModified: survey.updated_at ? new Date(survey.updated_at) : now,
+        changeFrequency: "daily",
+        priority: 0.7,
+      }))
+
+    return [...staticPages, ...surveyPages]
+  } catch {
+    return staticPages
+  }
+}

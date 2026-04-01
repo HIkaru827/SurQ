@@ -1,104 +1,114 @@
-import type { Metadata } from 'next'
-import { GeistSans } from 'geist/font/sans'
-import { GeistMono } from 'geist/font/mono'
-import { AuthProvider } from '@/lib/auth'
-import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { GoogleAnalytics } from '@/components/analytics/GoogleAnalytics'
-import { PrivacyNotice } from '@/components/analytics/PrivacyNotice'
-import './globals.css'
+import type { Metadata } from "next"
+import { GeistSans } from "geist/font/sans"
+import { GeistMono } from "geist/font/mono"
+import { AuthProvider } from "@/lib/auth"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics"
+import { PrivacyNotice } from "@/components/analytics/PrivacyNotice"
+import { SITE_URL } from "@/lib/seo"
+import "./globals.css"
 
 export const metadata: Metadata = {
   title: {
-    default: 'SurQ - 無料で使えるアンケートプラットフォーム',
-    template: '%s | SurQ'
+    default: "SurQ | 大学生向けアンケート回答交換サービス",
+    template: "%s | SurQ",
   },
-  description: '答えてポイント獲得、作って知見共有。SurQは質問者と回答者が価値を交換する革新的なアンケートプラットフォームです。無料登録で今すぐ始めよう。',
-  keywords: ['アンケート', 'survey', '調査', 'questionnaire', 'ポイント', 'フィードバック', 'マーケティング', 'リサーチ', '循環型', '知見共有', 'SurQ'],
-  authors: [{ name: 'SurQ Team' }],
-  creator: 'SurQ',
-  publisher: 'SurQ',
-  generator: 'Next.js',
-  manifest: '/manifest.json',
-  metadataBase: new URL('https://surq.net'),
+  description:
+    "SurQは、大学生同士でアンケートに回答し合える無料Webアプリです。卒論・ゼミ・レポート・個人開発のアンケート収集を、回答交換の仕組みで進められます。",
+  keywords: [
+    "大学生 アンケート 集める",
+    "卒論 アンケート 集まらない",
+    "アンケート 回答 募集",
+    "Googleフォーム 回答 集める",
+    "アンケート 回答交換",
+    "大学生 アンケート",
+    "SurQ",
+  ],
+  authors: [{ name: "SurQ Team" }],
+  creator: "SurQ",
+  publisher: "SurQ",
+  generator: "Next.js",
+  manifest: "/manifest.json",
+  metadataBase: new URL(SITE_URL),
   alternates: {
-    canonical: 'https://surq.net',
+    canonical: SITE_URL,
     languages: {
-      'ja-JP': 'https://surq.net',
+      "ja-JP": SITE_URL,
     },
   },
   openGraph: {
-    type: 'website',
-    locale: 'ja_JP',
-    url: 'https://surq.net',
-    title: 'SurQ - 無料で使えるアンケートプラットフォーム',
-    description: '答えてポイント獲得、作って知見共有。革新的な循環型アンケートシステム',
-    siteName: 'SurQ',
+    type: "website",
+    locale: "ja_JP",
+    url: SITE_URL,
+    title: "SurQ | 大学生向けアンケート回答交換サービス",
+    description:
+      "大学生向けのアンケート回答交換サービス。卒論・ゼミ・レポート・個人開発の調査を、無料で効率よく集められます。",
+    siteName: "SurQ",
     images: [
       {
-        url: 'https://surq.net/surq_logo.png',
+        url: `${SITE_URL}/surq_logo.png`,
         width: 1200,
         height: 630,
-        alt: 'SurQ - アンケートプラットフォーム',
+        alt: "SurQ - 大学生向けアンケート回答交換サービス",
       },
     ],
   },
   twitter: {
-    card: 'summary',
-    title: 'SurQ - 無料で使えるアンケートプラットフォーム',
-    description: '答えてポイント獲得、作って知見共有。革新的な循環型アンケートシステム',
+    card: "summary_large_image",
+    title: "SurQ | 大学生向けアンケート回答交換サービス",
+    description:
+      "大学生同士で回答し合い、卒論やレポートのアンケートを集めやすくする無料Webアプリ。",
     images: [
       {
-        url: 'https://surq.net/surq_logo.png',
-        alt: 'SurQ - アンケートプラットフォームのロゴ',
+        url: `${SITE_URL}/surq_logo.png`,
+        alt: "SurQ - 大学生向けアンケート回答交換サービス",
         width: 300,
         height: 300,
-      }
+      },
     ],
-    creator: '@SurQ_App',
-    site: '@SurQ_App',
+    creator: "@SurQ_App",
+    site: "@SurQ_App",
   },
   robots: {
     index: true,
     follow: true,
-    nocache: true,
     googleBot: {
       index: true,
       follow: true,
       noimageindex: false,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
-  category: 'technology',
+  category: "education",
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
-    title: 'SurQ',
+    statusBarStyle: "default",
+    title: "SurQ",
   },
   formatDetection: {
     telephone: false,
   },
   other: {
-    'mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'default',
-    'apple-mobile-web-app-title': 'SurQ',
-    'msapplication-TileColor': '#3b82f6',
-    // X (Twitter) Card additional properties
-    'twitter:domain': 'surq.net',
-    'twitter:url': 'https://surq.net',
-    'msapplication-tap-highlight': 'no',
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
+    "apple-mobile-web-app-title": "SurQ",
+    "msapplication-TileColor": "#3b82f6",
+    "twitter:domain": "surq.net",
+    "twitter:url": SITE_URL,
+    "msapplication-tap-highlight": "no",
   },
 }
 
 export function generateViewport() {
   return {
-    themeColor: '#3b82f6',
-    width: 'device-width',
+    themeColor: "#3b82f6",
+    width: "device-width",
     initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
+    maximumScale: 5,
+    userScalable: true,
   }
 }
 

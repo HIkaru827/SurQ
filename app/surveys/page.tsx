@@ -139,10 +139,13 @@ export default function SurveysPage() {
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            すべてのアンケート
+            公開中のアンケート一覧
           </h1>
-          <p className="text-xl text-muted-foreground mb-4">
-            回答してポイントを獲得しましょう！
+          <p className="text-xl text-muted-foreground mb-2">
+            大学生向けのアンケートに回答して、投稿権を獲得できます。
+          </p>
+          <p className="text-sm text-muted-foreground mb-4 max-w-3xl">
+            SurQは、卒論・ゼミ・レポート・個人開発のアンケートを集めたい人同士が回答し合うための一覧ページです。Googleフォーム形式のアンケートにも対応しています。
           </p>
           <div className="flex items-center gap-4 flex-wrap">
             <Badge variant="secondary" className="text-base px-3 py-1">
@@ -247,7 +250,6 @@ export default function SurveysPage() {
     </div>
   )
 }
-
 
 
 
