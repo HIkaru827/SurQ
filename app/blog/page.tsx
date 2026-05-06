@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, BookOpenText, Clock3, Sparkles } from "lucide-react"
+import { ArrowLeft, ArrowRight, BookOpenText, Clock3, Rss, Sparkles } from "lucide-react"
 import { blogPosts } from "@/lib/blog"
 import { createBreadcrumbSchema } from "@/lib/seo"
 import { StructuredData } from "@/components/seo/StructuredData"
@@ -16,6 +16,23 @@ function formatDate(date: string) {
 }
 
 export default function BlogPage() {
+  const blogCollectionSchema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "SurQ Blog",
+    description:
+      "卒業論文のアンケート調査や、個人開発の需要検証に役立つSurQのブログ記事一覧。",
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: blogPosts.map((post, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: `https://surq.net/blog/${post.slug}`,
+        name: post.title,
+      })),
+    },
+  }
+
   return (
     <>
       <StructuredData
@@ -24,10 +41,23 @@ export default function BlogPage() {
           { name: "ブログ", path: "/blog" },
         ])}
       />
+      <StructuredData data={blogCollectionSchema} />
 
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.16),_transparent_40%),linear-gradient(to_bottom,_rgba(255,255,255,1),_rgba(240,253,250,0.9))]">
         <main className="container mx-auto px-4 py-10 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
+            <nav aria-label="Breadcrumb" className="mb-6 text-sm text-muted-foreground">
+              <ol className="flex items-center gap-2">
+                <li>
+                  <Link href="/" className="hover:text-primary hover:underline">
+                    ホーム
+                  </Link>
+                </li>
+                <li>/</li>
+                <li className="text-foreground">ブログ</li>
+              </ol>
+            </nav>
+
             <div className="mb-8 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
@@ -43,12 +73,20 @@ export default function BlogPage() {
                 </div>
               </div>
 
-              <Button asChild variant="outline" className="rounded-full">
-                <Link href="/">
-                  <ArrowLeft className="h-4 w-4" />
-                  ホームへ
-                </Link>
-              </Button>
+              <div className="flex gap-3">
+                <Button asChild variant="outline" className="rounded-full">
+                  <Link href="/blog/rss.xml">
+                    <Rss className="h-4 w-4" />
+                    RSS
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="rounded-full">
+                  <Link href="/">
+                    <ArrowLeft className="h-4 w-4" />
+                    ホームへ
+                  </Link>
+                </Button>
+              </div>
             </div>
 
             <div className="mb-10 overflow-hidden rounded-[2rem] border border-primary/10 bg-white/90 shadow-[0_24px_80px_-48px_rgba(16,185,129,0.55)] backdrop-blur">

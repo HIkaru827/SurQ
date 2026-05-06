@@ -1,8 +1,14 @@
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, CalendarDays, Clock3 } from "lucide-react"
-import { blogPosts, getBlogPost } from "@/lib/blog"
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarDays,
+  Clock3,
+  Link2,
+} from "lucide-react"
+import { blogPosts, estimateWordCount, getBlogPost } from "@/lib/blog"
 import { absoluteUrl, createBreadcrumbSchema, createMetadata } from "@/lib/seo"
 import { StructuredData } from "@/components/seo/StructuredData"
 import { Badge } from "@/components/ui/badge"
@@ -44,13 +50,40 @@ export async function generateMetadata({
     })
   }
 
-  return createMetadata({
+  const base = createMetadata({
     title: post.title,
     description: post.description,
     path: `/blog/${post.slug}`,
     keywords: post.keywords,
     type: "article",
+    image: absoluteUrl(`/blog/${post.slug}/opengraph-image`),
   })
+
+  return {
+    ...base,
+    authors: [
+      {
+        name: post.authorName,
+        url: post.authorUrl,
+      },
+    ],
+    openGraph: {
+      ...base.openGraph,
+      type: "article",
+      publishedTime: post.publishedAt,
+      modifiedTime: post.updatedAt,
+      authors: [post.authorName],
+      section: post.category,
+      tags: post.keywords,
+    },
+    other: {
+      ...(base.other ?? {}),
+      "article:published_time": post.publishedAt,
+      "article:modified_time": post.updatedAt,
+      "article:section": post.category,
+      "article:tag": post.keywords.join(", "),
+    },
+  }
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
@@ -62,19 +95,26 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   }
 
   const relatedPosts = blogPosts.filter((entry) => entry.slug !== post.slug)
+  const wordCount = estimateWordCount(post)
 
   const articleSchema = {
     "@context": "https://schema.org",
-    "@type": "Article",
+    "@type": "BlogPosting",
     headline: post.title,
     description: post.description,
     datePublished: post.publishedAt,
-    dateModified: post.publishedAt,
+    dateModified: post.updatedAt,
     inLanguage: "ja-JP",
+    wordCount,
+    articleSection: post.category,
+    keywords: post.keywords.join(", "),
+    isAccessibleForFree: true,
     mainEntityOfPage: absoluteUrl(`/blog/${post.slug}`),
+    image: [absoluteUrl(`/blog/${post.slug}/opengraph-image`)],
     author: {
       "@type": "Organization",
-      name: "SurQ",
+      name: post.authorName,
+      url: post.authorUrl,
     },
     publisher: {
       "@type": "Organization",
@@ -84,6 +124,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         url: absoluteUrl("/surq_logo.png"),
       },
     },
+    about: post.highlights.map((item) => ({
+      "@type": "Thing",
+      name: item,
+    })),
   }
 
   return (
@@ -100,6 +144,24 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       <div className="min-h-screen bg-[linear-gradient(to_bottom,_rgba(236,253,245,0.7),_rgba(255,255,255,1)_18rem)]">
         <main className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
+            <nav aria-label="Breadcrumb" className="mb-6 text-sm text-muted-foreground">
+              <ol className="flex flex-wrap items-center gap-2">
+                <li>
+                  <Link href="/" className="hover:text-primary hover:underline">
+                    ホーム
+                  </Link>
+                </li>
+                <li>/</li>
+                <li>
+                  <Link href="/blog" className="hover:text-primary hover:underline">
+                    ブログ
+                  </Link>
+                </li>
+                <li>/</li>
+                <li className="text-foreground">{post.title}</li>
+              </ol>
+            </nav>
+
             <Button asChild variant="ghost" className="mb-6 rounded-full">
               <Link href="/blog">
                 <ArrowLeft className="h-4 w-4" />
@@ -113,11 +175,14 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   <Badge className="rounded-full px-3 py-1">{post.category}</Badge>
                   <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                     <CalendarDays className="h-4 w-4" />
-                    {formatDate(post.publishedAt)}
+                    公開: {formatDate(post.publishedAt)}
                   </span>
                   <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock3 className="h-4 w-4" />
                     {post.readingTime}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    更新: {formatDate(post.updatedAt)}
                   </span>
                 </div>
 
@@ -143,12 +208,40 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                   ))}
                 </div>
 
+                <div className="mb-10 rounded-[1.5rem] border border-primary/10 bg-emerald-50/60 p-5">
+                  <h2 className="mb-4 text-lg font-bold text-foreground">目次</h2>
+                  <ol className="space-y-3">
+                    {post.sections.map((section, index) => (
+                      <li key={section.id}>
+                        <a
+                          href={`#${section.id}`}
+                          className="inline-flex items-start gap-3 text-sm leading-6 text-foreground hover:text-primary hover:underline"
+                        >
+                          <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary/10 px-2 text-xs font-semibold text-primary">
+                            {index + 1}
+                          </span>
+                          <span>{section.heading}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+
                 <div className="space-y-10">
                   {post.sections.map((section) => (
-                    <section key={section.heading} className="space-y-5">
-                      <h2 className="text-2xl font-bold text-foreground md:text-3xl">
-                        {section.heading}
-                      </h2>
+                    <section key={section.id} id={section.id} className="scroll-mt-24 space-y-5">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold text-foreground md:text-3xl">
+                          {section.heading}
+                        </h2>
+                        <a
+                          href={`#${section.id}`}
+                          aria-label={`${section.heading} への固定リンク`}
+                          className="text-muted-foreground transition-colors hover:text-primary"
+                        >
+                          <Link2 className="h-4 w-4" />
+                        </a>
+                      </div>
                       {section.paragraphs.map((paragraph) => (
                         <p
                           key={paragraph}

@@ -1,4 +1,5 @@
 export type BlogSection = {
+  id: string
   heading: string
   paragraphs: string[]
   bullets?: string[]
@@ -11,9 +12,12 @@ export type BlogPost = {
   excerpt: string
   category: string
   publishedAt: string
+  updatedAt: string
   readingTime: string
   keywords: string[]
   highlights: string[]
+  authorName: string
+  authorUrl: string
   sections: BlogSection[]
 }
 
@@ -27,6 +31,7 @@ export const blogPosts: BlogPost[] = [
       "卒論アンケートでつまずきやすいのは、フォーム作成よりも回答収集です。研究目的に沿った設問設計と、回答が集まる導線づくりの両方を整理します。",
     category: "卒業論文",
     publishedAt: "2026-05-07",
+    updatedAt: "2026-05-07",
     readingTime: "約6分",
     keywords: [
       "卒業論文 アンケート",
@@ -39,8 +44,11 @@ export const blogPosts: BlogPost[] = [
       "回答者の負担を減らして回収率を上げる",
       "回答を集める導線まで含めて調査設計する",
     ],
+    authorName: "SurQ Team",
+    authorUrl: "https://surq.net",
     sections: [
       {
+        id: "why-surveys-work",
         heading: "なぜ卒業論文でアンケート調査が使われるのか",
         paragraphs: [
           "アンケート調査の強みは、多くの人の意見や行動傾向を、比較しやすい形で集められることです。インタビューのように深く掘る手法とは違い、傾向や差分を確認しやすいため、仮説の検証に向いています。",
@@ -48,6 +56,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "common-problems",
         heading: "卒論アンケートでよくある悩み",
         paragraphs: [
           "最も多い悩みは、やはり回答数です。フォームを作れても、配布先が限られていると十分なサンプルが集まらず、分析に自信が持てなくなります。",
@@ -60,6 +69,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "question-design",
         heading: "良いアンケートを作るためのポイント",
         paragraphs: [
           "大切なのは質問数を増やすことではなく、研究目的に直結する設問を絞ることです。何を明らかにしたいのかを先に言語化すると、不要な設問を減らしやすくなります。",
@@ -72,6 +82,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "collecting-responses",
         heading: "回答を集める段階で意識したいこと",
         paragraphs: [
           "アンケートは公開しただけでは広がりません。誰に、どこで、どう依頼するかまで含めて調査設計です。",
@@ -84,6 +95,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "analysis-friendly-data",
         heading: "分析しやすいデータを集める視点",
         paragraphs: [
           "アンケートは集めて終わりではありません。卒業論文では、その後に集計、比較、考察が待っています。",
@@ -91,6 +103,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "why-surq",
         heading: "SurQのような回答導線を持つ場を使う意味",
         paragraphs: [
           "フォーム作成ツールは多くありますが、回答者との接点まで用意されているとは限りません。卒論で本当に困りやすいのは、作成よりも配布と回収です。",
@@ -108,6 +121,7 @@ export const blogPosts: BlogPost[] = [
       "個人開発で大切なのは、たくさん作ることより、誰のどんな課題を解くかを先に掴むことです。需要検証にアンケートを使う意味と、SurQが向いている理由を整理します。",
     category: "個人開発",
     publishedAt: "2026-05-07",
+    updatedAt: "2026-05-07",
     readingTime: "約5分",
     keywords: [
       "個人開発 需要検証",
@@ -120,8 +134,11 @@ export const blogPosts: BlogPost[] = [
       "ターゲットを絞ると訴求と機能が明確になる",
       "SurQは回答収集まで含めた需要検証の導線を持ちやすい",
     ],
+    authorName: "SurQ Team",
+    authorUrl: "https://surq.net",
     sections: [
       {
+        id: "build-first-problem",
         heading: "ありがちな失敗は『作ってから考える』こと",
         paragraphs: [
           "個人開発では、アイデアが浮かぶとすぐに実装したくなります。ただ、その勢いだけで進めると、完成後に『誰に向けたサービスなのか説明できない』と気づくことがあります。",
@@ -134,6 +151,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "target-clarity",
         heading: "ターゲットが明確だと作るべきものが決まる",
         paragraphs: [
           "誰のためのサービスかが決まると、その人が抱える課題、使う場面、比較対象、刺さる訴求まで見えやすくなります。",
@@ -141,6 +159,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "answers-over-assumptions",
         heading: "需要を測るには思い込みより回答が必要",
         paragraphs: [
           "開発者は、自分のアイデアに愛着を持つほど、ユーザーの反応を都合よく解釈してしまいがちです。",
@@ -153,6 +172,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "surveys-for-indie-dev",
         heading: "個人開発者にアンケート調査が向いている理由",
         paragraphs: [
           "アンケートは、短期間で複数人の声を集めやすく、仮説の当たり外れを見直すきっかけになります。",
@@ -160,6 +180,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "response-collection",
         heading: "難しいのはフォーム作成より回答収集",
         paragraphs: [
           "多くの人がぶつかるのは、フォーム自体ではなく回答者集めです。SNSや知人だけでは、サンプルが足りなかったり、属性が偏ったりします。",
@@ -167,6 +188,7 @@ export const blogPosts: BlogPost[] = [
         ],
       },
       {
+        id: "surq-for-validation",
         heading: "SurQを需要検証の場として使うという選択肢",
         paragraphs: [
           "SurQは、アンケートの回答と投稿が循環する相互扶助型のプラットフォームです。他の人のアンケートに回答することで、自分のアンケートも投稿しやすくなります。",
@@ -184,4 +206,12 @@ export const blogPosts: BlogPost[] = [
 
 export function getBlogPost(slug: string) {
   return blogPosts.find((post) => post.slug === slug)
+}
+
+export function estimateWordCount(post: BlogPost) {
+  return post.sections.reduce((count, section) => {
+    const paragraphWords = section.paragraphs.join("").length
+    const bulletWords = section.bullets ? section.bullets.join("").length : 0
+    return count + paragraphWords + bulletWords
+  }, 0)
 }
