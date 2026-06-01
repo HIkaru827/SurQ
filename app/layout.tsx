@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { AuthProvider } from "@/lib/auth"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
+import { GoogleAdSense } from "@/components/analytics/GoogleAdSense"
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics"
 import { PrivacyNotice } from "@/components/analytics/PrivacyNotice"
 import { SITE_URL } from "@/lib/seo"
@@ -120,6 +121,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+        <GoogleAdSense />
         <GoogleAnalytics />
         <ErrorBoundary>
           <AuthProvider>
