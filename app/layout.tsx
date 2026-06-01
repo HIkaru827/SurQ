@@ -3,11 +3,12 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { AuthProvider } from "@/lib/auth"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
-import { GoogleAdSense } from "@/components/analytics/GoogleAdSense"
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics"
 import { PrivacyNotice } from "@/components/analytics/PrivacyNotice"
 import { SITE_URL } from "@/lib/seo"
 import "./globals.css"
+
+const ADSENSE_CLIENT_ID = "ca-pub-2931164651880564"
 
 export const metadata: Metadata = {
   title: {
@@ -120,8 +121,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
+      <head>
+        <script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`}
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <GoogleAdSense />
         <GoogleAnalytics />
         <ErrorBoundary>
           <AuthProvider>
